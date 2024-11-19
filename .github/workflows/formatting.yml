@@ -9,6 +9,5 @@ jobs:
         with:
             python-version: '3.11'
       - run: pip install -r requirements.txt
-      - run: pip install -r dev-requirements.txt
       - run: pylint srlife
       - run: black --check srlife test
