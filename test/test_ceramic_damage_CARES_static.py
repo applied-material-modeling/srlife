@@ -654,17 +654,22 @@ class TestMTSModelPennyShapedFlaw(unittest.TestCase):
         )
 
         # Summing up log probabilities over nelem and taking the value of one
-        R_MTS_PSF_s = (np.exp(np.sum(actual1))
+        R_MTS_PSF_s = (
+            np.exp(np.sum(actual1))
             if actual1 is not None
-            else print("surface reliability cannot be calculated"))
+            else print("surface reliability cannot be calculated")
+        )
         print("Time dep surface Reliability MTS_PSF = ", R_MTS_PSF_s)
 
         R_MTS_PSF_v = np.exp(np.sum(actual2))
         print("Time dep volume Reliability MTS_PSF = ", R_MTS_PSF_v)
 
         # Evaluating Probability of Failure
-        Pf_MTS_PSF_s = (1 - R_MTS_PSF_s if actual1 is not None
-                else print("surface failure probability cannot be calculated"))
+        Pf_MTS_PSF_s = (
+            1 - R_MTS_PSF_s
+            if actual1 is not None
+            else print("surface failure probability cannot be calculated")
+        )
         print("Time dep surface Probability of failure MTS_PSF = ", Pf_MTS_PSF_s)
 
         Pf_MTS_PSF_v = 1 - R_MTS_PSF_v
@@ -974,16 +979,22 @@ class TestCSEModelPennyShapedFlaw(unittest.TestCase):
         )
 
         # Summing up log probabilities over nelem and taking the value of one
-        R_CSE_PSF_s = (np.exp(np.sum(actual1)) if actual1 is not None
-                       else print("surface relability cannot be calculated"))
+        R_CSE_PSF_s = (
+            np.exp(np.sum(actual1))
+            if actual1 is not None
+            else print("surface relability cannot be calculated")
+        )
         print("Time dep surface Reliability CSE PSF = ", R_CSE_PSF_s)
 
         R_CSE_PSF_v = np.exp(np.sum(actual2))
         print("Time dep volume Reliability CSE PSF = ", R_CSE_PSF_v)
 
         # Evaluating Probability of Failure
-        Pf_CSE_PSF_s = (1 - R_CSE_PSF_s if actual1 is not None
-                        else print("surface failure probability cannot be calculated"))
+        Pf_CSE_PSF_s = (
+            1 - R_CSE_PSF_s
+            if actual1 is not None
+            else print("surface failure probability cannot be calculated")
+        )
         print("Time dep surface Probability of failure CSE PSF = ", Pf_CSE_PSF_s)
 
         Pf_CSE_PSF_v = 1 - R_CSE_PSF_v
@@ -1134,16 +1145,22 @@ class TestCSEModelGriffithNotch(unittest.TestCase):
         R_CSE_GN_s = np.exp(np.sum(actual1))
         print("Time dep surface Reliability CSE GN = ", R_CSE_GN_s)
 
-        R_CSE_GN_v = (np.exp(np.sum(actual2)) if actual2 is not None
-                      else print("volume reliability cannot be calculated"))
+        R_CSE_GN_v = (
+            np.exp(np.sum(actual2))
+            if actual2 is not None
+            else print("volume reliability cannot be calculated")
+        )
         print("Time dep volume Reliability CSE GN = ", R_CSE_GN_v)
 
         # Evaluating Probability of Failure
         Pf_CSE_GN_s = 1 - R_CSE_GN_s
         print("Time dep surface Probability of failure CSE GN = ", Pf_CSE_GN_s)
 
-        Pf_CSE_GN_v = (1 - R_CSE_GN_v if actual2 is not None
-                       else print("volume failure probability cannot be calculated"))
+        Pf_CSE_GN_v = (
+            1 - R_CSE_GN_v
+            if actual2 is not None
+            else print("volume failure probability cannot be calculated")
+        )
         print("Time dep volume Probability of failure CSE GN = ", Pf_CSE_GN_v)
 
         with open("CSE_GN_100k.txt", "a+") as external_file:
@@ -1453,16 +1470,22 @@ class TestSMMModelGriffithNotch(unittest.TestCase):
         R_SMM_GN_s = np.exp(np.sum(actual1))
         print("Time dep surface ReliabilityM SMM_GN = ", R_SMM_GN_s)
 
-        R_SMM_GN_v = (np.exp(np.sum(actual2)) if actual2 is not None
-                      else print("volume reliability cannot be calculated"))
+        R_SMM_GN_v = (
+            np.exp(np.sum(actual2))
+            if actual2 is not None
+            else print("volume reliability cannot be calculated")
+        )
         print("Time dep volume Reliability SMM_GN = ", R_SMM_GN_v)
 
         # Evaluating Probability of Failure
         Pf_SMM_GN_s = 1 - R_SMM_GN_s
         print("Time dep surface Probability of failure SMM_GN = ", Pf_SMM_GN_s)
 
-        Pf_SMM_GN_v = (1 - R_SMM_GN_v if actual2 is not None
-                       else print ("volume failure probability cannot be calculated"))
+        Pf_SMM_GN_v = (
+            1 - R_SMM_GN_v
+            if actual2 is not None
+            else print("volume failure probability cannot be calculated")
+        )
         print("Time dep volume Probability of failure SMM_GN = ", Pf_SMM_GN_v)
 
         with open("SMM_GN_100k.txt", "a+") as external_file:
@@ -1607,16 +1630,22 @@ class TestSMMModelPennyShapedFlaw(unittest.TestCase):
         )
 
         # Summing up log probabilities over nelem and taking the value of one
-        R_SMM_PSF_s = (np.exp(np.sum(actual1)) if actual1 is not None
-                       else print("surface reliability cannot be calculated"))
+        R_SMM_PSF_s = (
+            np.exp(np.sum(actual1))
+            if actual1 is not None
+            else print("surface reliability cannot be calculated")
+        )
         print("Time dep surface ReliabilityM SMM_PSF = ", R_SMM_PSF_s)
 
         R_SMM_PSF_v = np.exp(np.sum(actual2))
         print("Time dep volume Reliability SMM_PSF = ", R_SMM_PSF_v)
 
         # Evaluating Probability of Failure
-        Pf_SMM_PSF_s = (1 - R_SMM_PSF_s if actual1 is not None
-                        else print ("surface failure probability cannot be calculated"))
+        Pf_SMM_PSF_s = (
+            1 - R_SMM_PSF_s
+            if actual1 is not None
+            else print("surface failure probability cannot be calculated")
+        )
         print("Time dep surface Probability of failure SMM_PSF = ", Pf_SMM_PSF_s)
 
         Pf_SMM_PSF_v = 1 - R_SMM_PSF_v
@@ -1769,16 +1798,22 @@ class TestSMMModelSemiCircularCrack(unittest.TestCase):
         R_SMM_SCC_s = np.exp(np.sum(actual1))
         print("Time dep surface ReliabilityM SMM_SCC = ", R_SMM_SCC_s)
 
-        R_SMM_SCC_v = (np.exp(np.sum(actual2)) if actual2 is not None
-                       else print("Volume reliability cannot be calculated"))
+        R_SMM_SCC_v = (
+            np.exp(np.sum(actual2))
+            if actual2 is not None
+            else print("Volume reliability cannot be calculated")
+        )
         print("Time dep volume Reliability SMM_SCC = ", R_SMM_SCC_v)
 
         # Evaluating Probability of Failure
         Pf_SMM_SCC_s = 1 - R_SMM_SCC_s
         print("Time dep surface Probability of failure SMM_SCC = ", Pf_SMM_SCC_s)
 
-        Pf_SMM_SCC_v = (1 - R_SMM_SCC_v if actual2 is not None
-                        else print("volume failure probability cannot be calculated"))
+        Pf_SMM_SCC_v = (
+            1 - R_SMM_SCC_v
+            if actual2 is not None
+            else print("volume failure probability cannot be calculated")
+        )
         print("Time dep volume Probability of failure SMM_SCC = ", Pf_SMM_SCC_v)
 
         with open("SMM_SCC_100k.txt", "a+") as external_file:

@@ -967,7 +967,7 @@ class CrackShapeDependent(WeibullFailureModel):
         mavg = np.mean(self.mvals, axis=0)
         Navg = np.mean(N, axis=0)
         Bavg = np.mean(B, axis=0)
-        
+
         # Paging arrays
         if self.page:
             sigma_e = np.memmap(
@@ -1025,7 +1025,7 @@ class CrackShapeDependent(WeibullFailureModel):
 
         # Max principal stresss over all time steps for each element
         sigma_e_max = np.max(sigma_e, axis=0)
-        
+
         # Calculating ratio of cyclic stress to max cyclic stress (in one cycle)
         # for time-independent and time-dependent cases
         if np.all(time == 0):
@@ -1052,11 +1052,9 @@ class CrackShapeDependent(WeibullFailureModel):
 
             # Modifying threshold stress using scale parameter
             sigma_e_0_max = np.max(sigma_e_0)
-            if sigma_e_0_max > suavg[0]:
-                suavg = suavg
-            else:
-                suavg = (sigma_e_0_max/(savg[0] + suavg[0]))*suavg[0]
-            
+            if sigma_e_0_max <= suavg[0]:
+                suavg = (sigma_e_0_max / (savg[0] + suavg[0])) * suavg[0]
+
             # Subtracting threshold stress
             sigma_e_0 -= suavg[..., None, None]
             sigma_e_0[sigma_e_0 < 0] = 0
@@ -1074,7 +1072,7 @@ class CrackShapeDependent(WeibullFailureModel):
 
         # Summing over area integral elements ignoring NaN values
         flat = np.nansum(flat, axis=-1)
-        
+
         return flat
 
     def calculate_surface_flaw_flattened_eq_stress(
@@ -1218,11 +1216,9 @@ class CrackShapeDependent(WeibullFailureModel):
 
             # Modifying threshold stress using scale parameter
             sigma_e_0_max = np.max(sigma_e_0)
-            if sigma_e_0_max > suavg[0]:
-                suavg = suavg
-            else:
-                suavg = (sigma_e_0_max/(savg[0] + suavg[0]))*suavg[0]
-                
+            if sigma_e_0_max <= suavg[0]:
+                suavg = (sigma_e_0_max / (savg[0] + suavg[0])) * suavg[0]
+
             # Subtracting threshold stress
             sigma_e_0 -= suavg[..., None, None, None]
             sigma_e_0[sigma_e_0 < 0] = 0
@@ -1302,7 +1298,7 @@ class CrackShapeDependent(WeibullFailureModel):
             kbar = 2 * mavg + 1
 
         kpvals = kbar * kavg
-        
+
         # Equivalent stress raied to exponent mv
         # try:
         flat = (
@@ -1319,7 +1315,6 @@ class CrackShapeDependent(WeibullFailureModel):
         ) ** (1 / mavg)
         # except AttributeError:
         #     flat = 0.0
-            
 
         # Log reliability in each element
         log_reliability = -(2 * kpvals / np.pi) * (flat**mavg) * volumes
@@ -1767,10 +1762,8 @@ class WNTSAModel(CrackShapeIndependent):
 
             # Modifying threshold stress using scale parameter
             sigma_n_0_max = np.max(sigma_n_0)
-            if sigma_n_0_max > suavg[0]:
-                suavg = suavg
-            else:
-                suavg = (sigma_n_0_max/(savg[0] + suavg[0]))*suavg[0]
+            if sigma_n_0_max <= suavg[0]:
+                suavg = (sigma_n_0_max / (savg[0] + suavg[0])) * suavg[0]
 
             # Subtracting threshold stress
             sigma_n_0 -= suavg[..., None, None]
@@ -1917,11 +1910,9 @@ class WNTSAModel(CrackShapeIndependent):
 
             # Modifying threshold stress using scale parameter
             sigma_n_0_max = np.max(sigma_n_0)
-            if sigma_n_0_max > suavg[0]:
-                suavg = suavg
-            else:
-                suavg = (sigma_n_0_max/(savg[0] + suavg[0]))*suavg[0]
-            
+            if sigma_n_0_max <= suavg[0]:
+                suavg = (sigma_n_0_max / (savg[0] + suavg[0])) * suavg[0]
+
             # Subtracting threshold stress
             sigma_n_0 -= suavg[..., None, None, None]
             sigma_n_0[sigma_n_0 < 0] = 0
@@ -3130,9 +3121,7 @@ class SMMModelSemiCircularCrack(CrackShapeDependent):
         # Projected equivalent stress
         sigma_eq = 0.5 * (
             sigma_n
-            + np.sqrt(
-                (sigma_n**2) + (3.301 * (tau / cbar[..., None, None, None]) ** 2)
-            )
+            + np.sqrt((sigma_n**2) + (3.301 * (tau / cbar[..., None, None, None]) ** 2))
         )
 
         return sigma_eq
