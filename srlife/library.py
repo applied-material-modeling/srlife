@@ -1,6 +1,7 @@
 """
   Module that facilitates loading in all the material data
 """
+
 import os.path
 
 import xml.etree.ElementTree as ET

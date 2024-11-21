@@ -2,7 +2,7 @@ numpy
 scipy==1.9.2
 h5py
 vtk
-nose
+pytest
 matplotlib
 pylint==2.15.5
 neml
@@ -13,6 +13,6 @@ tqdm
 multiprocess
 dill
 parameterized
-black==22.1.0
+black==24.10.0
 jax[cpu]
 absl-py

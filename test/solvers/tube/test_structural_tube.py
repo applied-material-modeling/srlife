@@ -139,9 +139,7 @@ class TestAxialStiffnessExact(unittest.TestCase):
         self.force_exact = (
             np.pi * (self.ro**2.0 - self.ri**2.0) * self.E * self.d / self.h
         )
-        self.stiffness_exact = (
-            np.pi * (self.ro**2.0 - self.ri**2.0) * self.E / self.h
-        )
+        self.stiffness_exact = np.pi * (self.ro**2.0 - self.ri**2.0) * self.E / self.h
 
         self.solver = structural.PythonTubeSolver(verbose=False)
 
@@ -172,11 +170,7 @@ class TestAxialStiffnessExact(unittest.TestCase):
     def test_3D(self):
         state = self._solve(self.d)
 
-        cf = (
-            np.sum(state.basis.dx)
-            / self.h
-            / (np.pi * (self.ro**2.0 - self.ri**2.0))
-        )
+        cf = np.sum(state.basis.dx) / self.h / (np.pi * (self.ro**2.0 - self.ri**2.0))
 
         self.assertAlmostEqual(self.force_exact, state.force / cf, places=3)
         self.assertAlmostEqual(self.stiffness_exact, state.stiffness / cf, places=3)

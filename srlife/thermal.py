@@ -1399,15 +1399,11 @@ class FiniteDifferenceImplicitThermalProblem:
             mode="edge",
         )
 
-        D1 = (self.act * ah[:, :-1] / (self.r**2.0 * self.dt**2.0)).flatten()[
-            self.nz :
-        ]
+        D1 = (self.act * ah[:, :-1] / (self.r**2.0 * self.dt**2.0)).flatten()[self.nz :]
         D2 = -(
             self.act * (ah[:, :-1] + ah[:, 1:]) / (self.r**2.0 * self.dt**2.0)
         ).flatten()
-        D3 = (self.act * ah[:, 1:] / (self.r**2.0 * self.dt**2.0)).flatten()[
-            : -self.nz
-        ]
+        D3 = (self.act * ah[:, 1:] / (self.r**2.0 * self.dt**2.0)).flatten()[: -self.nz]
 
         return sp.diags(
             (D1, D2, D3),
