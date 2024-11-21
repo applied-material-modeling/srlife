@@ -5,7 +5,7 @@ import numpy as np
 import scipy.interpolate as inter
 
 from srlife import materials
-from helpers import differentiate
+from test.helpers import differentiate
 
 
 class CommonThermalMaterial:

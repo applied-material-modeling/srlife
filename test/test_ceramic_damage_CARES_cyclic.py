@@ -182,12 +182,6 @@ class TestPIAModel(unittest.TestCase):
         Pf_PIA_v = 1 - R_PIA_v
         print("Time dep volume Probability of failure PIA = ", Pf_PIA_v)
 
-        with open("PIA_60k_80k.txt", "a+") as external_file:
-            external_file.write("\n")
-            external_file.write(f"{Pf_PIA_s}")
-            external_file.write("\n")
-            external_file.write(f"{Pf_PIA_v}")
-
 
 class TestCSEModelGriffithFlaw(unittest.TestCase):
     def setUp(self):
@@ -345,12 +339,6 @@ class TestCSEModelGriffithFlaw(unittest.TestCase):
         Pf_CSE_GF_v = 1 - R_CSE_GF_v
         print("Time dep volume Probability of failure CSE GF = ", Pf_CSE_GF_v)
 
-        with open("CSE_GF_60k_80k.txt", "a+") as external_file:
-            external_file.write("\n")
-            external_file.write(f"{Pf_CSE_GF_s}")
-            external_file.write("\n")
-            external_file.write(f"{Pf_CSE_GF_v}")
-
 
 class TestSMMModelGriffithFlaw(unittest.TestCase):
     def setUp(self):
@@ -507,12 +495,6 @@ class TestSMMModelGriffithFlaw(unittest.TestCase):
 
         Pf_SMM_GF_v = 1 - R_SMM_GF_v
         print("Time dep volume Probability of failure SMM_GF = ", Pf_SMM_GF_v)
-
-        with open("SMM_GF_60k_80k.txt", "a+") as external_file:
-            external_file.write("\n")
-            external_file.write(f"{Pf_SMM_GF_s}")
-            external_file.write("\n")
-            external_file.write(f"{Pf_SMM_GF_v}")
 
 
 class TestSMMModelSemiCircularCrack(unittest.TestCase):
@@ -674,9 +656,3 @@ class TestSMMModelSemiCircularCrack(unittest.TestCase):
             else print("volume failure probability cannot be calculated")
         )
         print("Time dep volume Probability of failure SMM_SCC = ", Pf_SMM_SCC_v)
-
-        with open("SMM_SCC_60k_80k.txt", "a+") as external_file:
-            external_file.write("\n")
-            external_file.write(f"{Pf_SMM_SCC_s}")
-            external_file.write("\n")
-            external_file.write(f"{Pf_SMM_SCC_v}")
