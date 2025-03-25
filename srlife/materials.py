@@ -1,8 +1,8 @@
 # pylint: disable=dangerous-default-value, unused-import
 """
-  This module contains material models containing thermal, fluid, and
-  material properties.  These models can be stored to and recalled from
-  XML files for archiving.
+This module contains material models containing thermal, fluid, and
+material properties.  These models can be stored to and recalled from
+XML files for archiving.
 """
 
 from collections import ChainMap
@@ -460,6 +460,19 @@ class StructuralMaterial:
 
     def __init__(self, data):
         self.data = data
+
+    def rupture_statistics_log_time(self, temp, stress):
+        """
+        Returns the log mean and variance of the time to rupture distribution at this stress and temperature
+
+        Args:
+            temp:       temperature in K
+            stress:     stress in MPa
+        """
+        mean = np.log10(self.time_to_rupture("averageRupture", temp, stress))
+        SEE = destring_array(self.data["SEE"])[0]
+
+        return mean, (SEE / temp) ** 2.0
 
     def cycles_to_fail(self, pname, temp, erange):
         """

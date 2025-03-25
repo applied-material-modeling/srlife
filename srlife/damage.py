@@ -1,14 +1,16 @@
 # pylint: disable=no-member
 """
-  This module contains methods for calculating the reliability and
-  creep-fatigue damage given completely-solved tube results and
-  damage material properties
+This module contains methods for calculating the reliability and
+creep-fatigue damage given completely-solved tube results and
+damage material properties
 """
 import numpy as np
 import numpy.linalg as la
 import scipy.optimize as opt
 import multiprocess
 from scipy.special import gamma
+
+import scipy.stats as ss
 
 
 class WeibullFailureModel:
@@ -3463,3 +3465,131 @@ class TimeFractionInteractionDamage(DamageCalculator):
             )
 
         return dmg
+
+
+class StatisticalTimeFractionDamage(DamageCalculator):
+
+    def creep_damage(self, tube, material, receiver):
+        """
+        Calculate creep damage at each material point
+
+        Parameters:
+          tube        single tube with full results
+          material    damage material model
+          receiver    receiver, for metadata
+        """
+        # For now just use the von Mises effective stress
+        vm = np.sqrt(
+            (
+                (
+                    tube.quadrature_results["stress_xx"]
+                    - tube.quadrature_results["stress_yy"]
+                )
+                ** 2.0
+                + (
+                    tube.quadrature_results["stress_yy"]
+                    - tube.quadrature_results["stress_zz"]
+                )
+                ** 2.0
+                + (
+                    tube.quadrature_results["stress_zz"]
+                    - tube.quadrature_results["stress_xx"]
+                )
+                ** 2.0
+                + 6.0
+                * (
+                    tube.quadrature_results["stress_xy"] ** 2.0
+                    + tube.quadrature_results["stress_yz"] ** 2.0
+                    + tube.quadrature_results["stress_xz"] ** 2.0
+                )
+            )
+            / 2.0
+        )
+
+        means, variances = material.rupture_statistics_log_time(
+            tube.quadrature_results["temperature"], vm
+        )
+        means = -means[1:]
+        variances = variances[1:]
+
+        dt = np.diff(tube.times)
+
+        l10 = np.log(10.0)
+        E_s = np.sum(
+            np.exp(l10 * means + l10**2.0 * variances / 2.0) * dt[:, None, None], axis=0
+        )
+        std_s = np.sum(
+            (
+                np.sqrt(
+                    (np.exp(l10**2.0 * variances) - 1.0)
+                    * np.exp(2.0 * l10 * means + l10**2.0 * variances)
+                )
+            )
+            * dt[:, None, None],
+            axis=0,
+        )
+        var_s = std_s**2.0
+
+        mu_D = (np.log(E_s**4.0) - np.log(E_s**2.0 + var_s)) / np.log(100.0)
+        variance_D = 2.0 * (np.log(np.sqrt(E_s**2.0 + var_s) / E_s)) / l10**2
+
+        return mu_D, variance_D
+
+    def cdf_repetitions(self, N, tube, material, receiver, Nspace=100):
+        """
+        Extrapolate the pdf of damage over cycles
+
+        Parameters:
+          N           number of cycles
+          tube        single tube with full results
+          material    damage material model
+          receiver    receiver, for metadata
+        """
+        Ns = np.linspace(1, float(N), Nspace)
+        mu_D, variance_D = self.creep_damage(tube, material, receiver)
+
+        p = np.array(
+            [
+                1.0
+                - ss.norm.cdf(
+                    np.log10(1.0),
+                    loc=mu_D + np.log10(n),
+                    scale=np.sqrt(variance_D),
+                )
+                for n in Ns
+            ]
+        )
+        return Ns, p
+
+    def cdf_tube_chain(self, N, tube, material, receiver):
+        """
+        Calculate the pdf of damage over cycles
+
+        Parameters:
+          N           number of cycles
+          tube        single tube with full results
+          material    damage material model
+          receiver    receiver, for metadata
+        """
+        reps, cdf = self.cdf_repetitions(N, tube, material, receiver)
+        one_minus = 1.0 - cdf.reshape(cdf.shape[0], -1)
+
+        return reps, 1.0 - np.prod(one_minus, axis=1)
+
+    def cdf_tube_max(self, N, tube, material, receiver):
+        """
+        Calculate the pdf of damage over cycles
+
+        Parameters:
+          N           number of cycles
+          tube        single tube with full results
+          material    damage material model
+          receiver    receiver, for metadata
+        """
+        reps, cdf = self.cdf_repetitions(N, tube, material, receiver)
+        cdf = cdf.reshape(cdf.shape[0], -1)
+        ii = np.argmax(cdf > 0.5, axis=0)
+        ii[ii == 0] = cdf.shape[0] + 1
+        ind = np.argmin(ii)
+
+        return reps, cdf[:, ind]

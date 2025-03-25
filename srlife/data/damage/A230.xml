@@ -12,6 +12,7 @@
       <a>-4203.2213619 22130.61350503</a>
       <n>1 0</n>
     </lowerboundRupture>
+    <SEE>562.842</SEE>
     <nominalFatigue>
       <curve1>
         <T>700.15</T>
