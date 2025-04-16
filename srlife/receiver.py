@@ -1509,7 +1509,7 @@ class FilmCoefficientConvectiveBC(ThermalBC):
         self.fluid_T = fluid_T
         self.film = film
 
-        if fluid_T.shape != (nz,) or film.shape != (nz):
+        if fluid_T.shape != (nz,) or film.shape != (nz,):
             raise ValueError(
                 "Film coefficient and fluid temperature data must have size (nz,)"
             )
