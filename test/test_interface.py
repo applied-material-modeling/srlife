@@ -206,7 +206,7 @@ class InterfaceUnitTests(unittest.TestCase):
     def test_cycle_tube_pressure_bcs(self):
         times = np.array([0, 1])
         tube_pressure = 12
-        pressure = np.ones_like(times)*tube_pressure
+        pressure = np.ones_like(times) * tube_pressure
         pressure[0] = 0.0
         tube = interface.create_tube(tube_dict_unit, times, [])
         tube_pressure_bc = receiver.PressureBC(times, pressure)
@@ -215,10 +215,8 @@ class InterfaceUnitTests(unittest.TestCase):
         tubes_dict = {"0": tube}
         num_cycles = 3
         cyclic_times = np.array([0, 1, 2, 3])
-        interface.cycle_tube_pressure_bcs(
-            tubes_dict, num_cycles, cyclic_times
-        )
-        gold = np.array([0,12,12,12])
+        interface.cycle_tube_pressure_bcs(tubes_dict, num_cycles, cyclic_times)
+        gold = np.array([0, 12, 12, 12])
         self.assertTrue(np.array_equal(gold, tube.pressure_bc.data))
 
     def test_set_and_downsample_tube_temp_bcs(self):
@@ -384,7 +382,7 @@ class InterfaceRegressionTest(unittest.TestCase):
         # NOTE: making very large for test for single iter convergence
         pct_err_outlet_temp = 100.25
         panel_flow_path = [["1"], ["0"]]
-        mass_flow_per_path = np.ones((len(panel_flow_path),len(times)))*650  # kg/s
+        mass_flow_per_path = np.ones((len(panel_flow_path), len(times))) * 650  # kg/s
         T_in_per_path = np.array([500, 500])  # Celcius
         use_cycle_reset_heuristic = False
         save_heat_to_vtu = False
@@ -503,7 +501,7 @@ class InterfaceRegressionTest(unittest.TestCase):
         )
         inlet_p = outlet_p + interface.convert_Pa_to_MPa(flow_path_p_loss)
         interface.update_tube_pressure_bcs(rec, inlet_p, outlet_p)
-        rec.save(rec_filename+hdf5_ext)
+        rec.save(rec_filename + hdf5_ext)
 
         # STEP 6: solve structure and life receiver
         struct_output_dict = {
