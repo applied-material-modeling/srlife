@@ -354,13 +354,14 @@ class Receiver:
         dist = np.sqrt(np.dot(orientation, orientation))
         tube_name = f"fch_{prev_panel_node.name}_to_{panel_node.name}"
         manifold_tube_ir = convert_mm_to_m(manifold_tube.r - manifold_tube.t)
+        A_pipe = np.pi*manifold_tube_ir**2
         comp_node.append(tube_name,
                           type="FlowChannel1Phase",
                           position=make_moose_hit_vector(tube_start),
                           orientation=make_moose_hit_vector(orientation),
                           n_elems=manifold_tube.nz,
                           length=dist,
-                          A=np.pi*manifold_tube_ir**2,
+                          A=A_pipe,
                           D_h=2.0*manifold_tube_ir,
                           roughness=tube_roughness,
                           fp="fp")
@@ -370,14 +371,14 @@ class Receiver:
         comp_node.append(f"jct_{prev_panel_node.name}_to_connector",
                           type="VolumeJunction1Phase",
                           position=make_moose_hit_vector(tube_start),
-                          volume=1.0e-5,
+                          volume=A_pipe*2.0,
                           connections=make_moose_hit_vector(connectivity))
         connectivity = [f"{tube_name}:out",
                         f"{panel_node.name}/{panel_tube_name}:{in_out_string}"]
         comp_node.append(f"jct_connector_to_{panel_node.name}",
                           type="VolumeJunction1Phase",
                           position=make_moose_hit_vector(tube_end),
-                          volume=1.0e-5,
+                          volume=A_pipe*2.0,
                           connections=make_moose_hit_vector(connectivity))
 
     def create_moose_thm_front_matter(self, moose_root,
@@ -415,7 +416,7 @@ class Receiver:
                         prop_names=make_moose_hit_vector(["density",
                                                           "specific_heat",
                                                           "thermal_conductivity"]),
-                        prop_values=make_moose_hit_vector([8050,573,20]))
+                        prop_values=make_moose_hit_vector([3200,947,60]))
         # fluid properties
         fluid_node = moose_root.append("FluidProperties")
         fluid_node.append("sco2",
@@ -433,7 +434,7 @@ class Receiver:
                                                                            "cp",
                                                                            "c",
                                                                            "entropy"]),
-                          out_of_bounds_behavior="throw",
+                          out_of_bounds_behavior="declare_invalid",
                           temperature_min = 240,
                           temperature_max = 999,
                           pressure_min = 1e7,
@@ -476,7 +477,7 @@ class Receiver:
     def create_moose_thm_back_matter(self, moose_root,
                                      flow_path_name,
                                      target_outlet_T,
-                                     initial_mass_flow,
+                                     mass_flow_with_t,
                                      inlet_name,
                                      inlet_pipe_name, outlet_pipe_name,
                                      start_time, end_time,
@@ -490,7 +491,7 @@ class Receiver:
           moose_root (pyhit.Node): pyhit node for the root of moose sim
           flow_path_name (string): flowpath name used to set filename for csv outs
           target_outlet_T (double): target temperature for outlet, used in controls
-          initial_mass_flow (double): initial mass flow rate for flowpath
+          mass_flow_with_t (np.array): mass flow rate with time
           inlet_name (string): name of pyhit node for inlet to flowpath
           inlet_pipe_name (string): name of pipe after inlet
           outlet_pipe_name (string): name of pipe before outlet
@@ -513,10 +514,12 @@ class Receiver:
             if func_node == None:
                 func_node = moose_root.append("Functions")
             # BPMToDo:: automate this part
+            times = np.arange(start_time, end_time, dtmax)
+            times = np.append(times, end_time)
             func_node.append(m_dot_fun,
                              type = "PiecewiseLinear",
-                             x = make_moose_hit_vector([0,10,100,3600,36000,46800]),
-                             y = make_moose_hit_vector([0,0.1,1.0,5.0,5.0,5.0]))
+                             x = make_moose_hit_vector(times),
+                             y = make_moose_hit_vector(mass_flow_with_t))
             control_node = moose_root.append("ControlLogic")
             control_node.append("set_inlet_mass_flow",
                                 type="TimeFunctionComponentControl",
@@ -583,15 +586,18 @@ class Receiver:
                                 nl_max_its=nl_max_its)
         exec_node.append("TimeStepper",
                          type = "IterationAdaptiveDT",
-                         dt = dt)
+                         dt = dt,
+                         growth_factor=4)
         exec_node.append("TimeIntegrator",
                          type = "BDF2")
         # OUTPUTS
-        sync_times = np.arange(start_time, end_time, dtmax)
+        sync_times = np.arange(start_time, end_time+dtmax, dtmax)
         output_node=moose_root.append("Outputs",
-                                exodus="true",
-                                sync_times = make_moose_hit_vector(sync_times),
                                 print_linear_residuals="false")
+        output_node.append("exo",
+                           type="Exodus",
+                           sync_times = make_moose_hit_vector(sync_times),
+                           sync_only = "true")
         output_node.append("console",
                            type="Console",
                            max_rows=1,
@@ -604,7 +610,7 @@ class Receiver:
                                                        "m_dot_inlet",
                                                        "path_T_out"]))
 
-    def create_moose_thm_model(self, moose_filename, rec_diam,
+    def create_moose_thm_model(self, moose_filename, rec_diam, tube_od,
                                tube_spacing, tube_roughness, manifold_tube,
                                outlet_p, target_outlet_T,
                                start_time, end_time, dt, nl_rel_tol, nl_abs_tol):
@@ -620,6 +626,7 @@ class Receiver:
         Args:
             moose_filename (string): filename used for the moose input 
             rec_diam (double): diameter of receiver (THIS SHOULD BE MEMBER OF REC)
+            tube_od (double): diameter of receiver tubes
             tube_spacing (double): space between tubes, for edge spacing to tubes
             tube_roughness (double): tube roughness used in flow simulation
             manifold_tube (Tube): srlife tube objects for manifold pipes
@@ -644,7 +651,7 @@ class Receiver:
         # This loop will create a moose input file for each flowpath in receiver
         panel_delta_theta = 2.0*np.pi/self.npanels
         rec_radius = 0.5*convert_mm_to_m(rec_diam)
-        edge_spacing_angle = convert_mm_to_m(tube_spacing+0.5*21.3)/(rec_radius)
+        edge_spacing_angle = convert_mm_to_m(tube_spacing+0.5*tube_od)/(rec_radius)
         filenames = []
         for path_key, flowpath in self.flowpaths.items():
             # for each flowpath in receiver
@@ -717,7 +724,7 @@ class Receiver:
             outlet_pipe_name = connectivity
             flow_path_name = f"flowpath_{path_key}"
             self.create_moose_thm_back_matter(moose_root, flow_path_name, target_outlet_T,
-                                              convert_kghr_to_kgs(flowpath["mass_flow"][0]),
+                                              convert_kghr_to_kgs(flowpath["mass_flow"]),
                                               inlet_name,
                                               inlet_pipe_name, outlet_pipe_name,
                                               start_time, end_time,
@@ -768,7 +775,7 @@ class Receiver:
         for iPath, flowpath in enumerate(self.flowpaths.values()):
             # for each flowpath in model
             input_filename = moose_input_filenames[iPath]
-            output_filename = input_filename[0:-2] + "_out.e"
+            output_filename = input_filename[0:-2] + "_exo.e"
             # read temp and pressure results from output exodus
             times, press_results, temp_results = read_moose_thm_exodus_file(output_filename)
             for panel_name in flowpath["panels"]:
@@ -813,7 +820,7 @@ def read_moose_thm_exodus_file(moose_output_filename):
                 pressure_results = []
                 for iStep, time in enumerate(times):
                     press_data = model.get_variable_values("EX_ELEM_BLOCK", iElemBlk,
-                                                           'p', iStep)
+                                                           'p', iStep+1)
                     pressure_results.append(press_data)
                 pressure_dict[name] = np.array(pressure_results)
             if "heat_tube" in name:
@@ -827,9 +834,8 @@ def read_moose_thm_exodus_file(moose_output_filename):
 
                 for iStep, time in enumerate(times):
                     temp_data = model.get_variable_values("EX_NODAL", iElemBlk,
-                                                          "T_solid", iStep)
-                    # BPM: we need to map from generic nodes back to srlife datastruct
-                    temp_results.append(temp_data[nodes])
+                                                          "T_solid", iStep+1)
+                    temp_results.append(temp_data[nodes-1])
                 temp_dict[name] = [np.array(nodeCoord), np.array(temp_results)]
     return times, pressure_dict, temp_dict
 
@@ -1018,6 +1024,7 @@ class Panel:
                                   panel_node.name+"/"+bot_connector_tube_2_name, "out")
         # create panel in tube and junction
         panel_in_tube_name = f"fch_{panel_node.name}_in"
+        A_pipe = np.pi*manifold_tube_ir**2
         panel_node.append(panel_in_tube_name,
                           type="FlowChannel1Phase",
                           position=make_moose_hit_vector([midpoint[0],
@@ -1026,7 +1033,7 @@ class Panel:
                           orientation=make_moose_hit_vector([0.0,0.0,1.0]),
                           n_elems=manifold_tube.nz,
                           length=panel_in_out_length,
-                          A=np.pi*manifold_tube_ir**2,
+                          A=A_pipe,
                           D_h=2.0*manifold_tube_ir,
                           roughness=tube_roughness,
                           fp="fp")
@@ -1036,7 +1043,7 @@ class Panel:
         panel_node.append(f"jct_{panel_node.name}_tube_in",
                           type="VolumeJunction1Phase",
                           position=make_moose_hit_vector([midpoint[0],midpoint[1],0]),
-                          volume=1.0e-5,
+                          volume=A_pipe*2.0,
                           connections=make_moose_hit_vector(connectivity))
         
         # first half of top tube
@@ -1051,14 +1058,14 @@ class Panel:
                                                              0.0]),
                           n_elems=manifold_tube.nz,
                           length=0.5*dist,
-                          A=np.pi*manifold_tube_ir**2,
+                          A=A_pipe,
                           D_h=2.0*manifold_tube_ir,
                           roughness=tube_roughness,
                           fp="fp")
         # find and add to jct for prev tube
         jct_name = f"jct_tube_{iTube-1}_top"
         add_tube_to_moose_thm_jct(panel_node, jct_name,
-                                       panel_node.name+"/"+top_connector_tube_1_name, "in")
+                                  panel_node.name+"/"+top_connector_tube_1_name, "in")
         # second half of top tube
         top_connector_tube_2_name = f"fch_tube_out_to_{iTube}_top"
         panel_node.append(top_connector_tube_2_name,
@@ -1071,14 +1078,14 @@ class Panel:
                                                              0.0]),
                           n_elems=manifold_tube.nz,
                           length=0.5*dist,
-                          A=np.pi*manifold_tube_ir**2,
+                          A=A_pipe,
                           D_h=2.0*manifold_tube_ir,
                           roughness=tube_roughness,
                           fp="fp")
         # find and add to jct for this tube
         jct_name = f"jct_tube_{iTube}_top"
         add_tube_to_moose_thm_jct(panel_node, jct_name,
-                                       panel_node.name+"/"+top_connector_tube_2_name, "out")
+                                  panel_node.name+"/"+top_connector_tube_2_name, "out")
         # create panel out tube and junction
         panel_out_tube_name = f"fch_{panel_node.name}_out"
         panel_node.append(panel_out_tube_name,
@@ -1089,7 +1096,7 @@ class Panel:
                           orientation=make_moose_hit_vector([0.0,0.0,1.0]),
                           n_elems=manifold_tube.nz,
                           length=panel_in_out_length,
-                          A=np.pi*manifold_tube_ir**2,
+                          A=A_pipe,
                           D_h=2.0*manifold_tube_ir,
                           roughness=tube_roughness,
                           fp="fp")
@@ -1099,7 +1106,7 @@ class Panel:
         panel_node.append(f"jct_{panel_node.name}_tube_out",
                           type="VolumeJunction1Phase",
                           position=make_moose_hit_vector([midpoint[0],midpoint[1],tube_height]),
-                          volume=1.0e-5,
+                          volume=A_pipe*2.0,
                           connections=make_moose_hit_vector(connectivity))
 
 
@@ -1845,8 +1852,6 @@ class Tube:
         """
         for _, res in self.results.items():
             if res.shape[0] != len(times):
-                print(res.shape[0])
-                print(len(times))
                 raise ValueError(
                     "Cannot change times to provided values, will be"
                     " incompatible with existing results"
@@ -2134,12 +2139,14 @@ class Tube:
         mesh_node = tube_mesh_root.append("Mesh")
         # add ring mesh
         ring_name = "ring_2d"
+        r_outer = convert_mm_to_m(self.r)
+        h = convert_mm_to_m(self.h)
         mesh_node.append(ring_name+"_mesh",
                          type="AnnularMeshGenerator",
                          nr = self.nr-1,
                          nt = self.nt,
                          rmin = convert_mm_to_m(self.r - self.t),
-                         rmax = convert_mm_to_m(self.r))
+                         rmax = r_outer)
         # split outer boundary of tube
         mesh_node.append(ring_name,
                          type="PatchSidesetGenerator",
@@ -2150,11 +2157,12 @@ class Tube:
         mesh_node.append("tube",
                          type="AdvancedExtruderGenerator",
                          input=ring_name,
-                         heights=make_moose_hit_vector([1,1,convert_mm_to_m(self.h)]),
+                         heights=make_moose_hit_vector([1,1,h]),
                          num_layers=make_moose_hit_vector([0,0,(self.nz-1)]),
                          direction=make_moose_hit_vector([0,0,1]),
                          bottom_boundary="bot",
                          top_boundary="top")
+
         # rotate tube
         mesh_node.append("tube_rot",
                          type="TransformGenerator",
@@ -2283,13 +2291,14 @@ class Tube:
         """
         tube_ir = convert_mm_to_m(self.r - self.t)
         tube_fch_name = f"fch_tube_{tube_num}"
+        A_pipe = np.pi*(tube_ir)**2
         panel_node.append(tube_fch_name,
                           type="FlowChannel1Phase",
                           position=make_moose_hit_vector([x_tube, y_tube, 0]),
                           orientation=make_moose_hit_vector([0, 0, 1]),
                           n_elems=(self.nz-1),
                           length=convert_mm_to_m(self.h),
-                          A=np.pi*(tube_ir)**2,
+                          A=A_pipe,
                           D_h=2.0*(tube_ir),
                           roughness=tube_roughness,
                           fp="fp")
@@ -2298,12 +2307,12 @@ class Tube:
         panel_node.append(f"jct_tube_{tube_num}_bot",
                           type="VolumeJunction1Phase",
                           position=make_moose_hit_vector([x_tube,y_tube,0]),
-                          volume=1.0e-5,
+                          volume=A_pipe*2.0,
                           connections=make_moose_hit_vector([f"{panel_node.name}/fch_tube_{tube_num}:in"]))
         panel_node.append(f"jct_tube_{tube_num}_top",
                           type="VolumeJunction1Phase",
                           position=make_moose_hit_vector([x_tube,y_tube,convert_mm_to_m(self.h)]),
-                          volume=1.0e-5,
+                          volume=A_pipe*2.0,
                           connections=make_moose_hit_vector([f"{panel_node.name}/fch_tube_{tube_num}:out"]))
         # make 3D tube for heat transfer
         panel_tube_mesh_filename = \
@@ -2335,38 +2344,7 @@ class Tube:
                        variable="T_solid",
                        boundary=f"{panel_node.name}/{heat_tube_name}:rmax_0",
                        function=bc_func_name)
-        func_node = moosetree.find(moose_root, func=lambda n: n.name=="Functions")
-        if func_node is None:
-            print("NO FUNCTIONS BLOCK YET???")
-        func_data_filename = f"{bc_func_name}.txt"
-        func_node.append(bc_func_name+"_NotUsing",
-                         type="PiecewiseMultilinear",
-                         data_file=func_data_filename)
-        axis_t, axis_x, axis_z, data = \
-            self.heat_flux_data_to_moose_thm_data(bc_func_name)
-        with open(func_data_filename, "w") as f:
-            f.write("# GENERATED AUTOMATICALLY FROM srlife\n")
-            f.write("AXIS T\n")
-            for iT in axis_t:
-                f.write(f"{iT} ")
-            f.write("\n")
-            f.write("AXIS X\n")
-            for iX in axis_x:
-                f.write(f"{iX} ")
-            f.write("\n")
-            f.write("AXIS Z\n")
-            for iZ in axis_z:
-                f.write(f"{iZ} ")
-            f.write("\n")
-            f.write("DATA\n")
-            for iTime in data:
-                f.write("# TIMESTEP\n")
-                for iX in iTime:
-                    for iZ in iX:
-                        f.write(f"{iZ} ")
-                    f.write("\n")
-
- 
+         
 
     def heat_flux_data_to_moose_thm_data(self, func_name):
         """
@@ -2504,6 +2482,7 @@ class Tube:
         # also convert from Pa to MPa
         press = np.array([convert_Pa_to_MPa(np.average(press_step))
                           for press_step in press_data])
+
         bc = PressureBC(times, press)
         self.set_pressure_bc(bc)
         # add temp results to tube
