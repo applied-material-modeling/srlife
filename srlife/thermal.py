@@ -86,6 +86,7 @@ class ThermohydraulicsThermalSolver:
 
         self.solid_params = pset.get_default("solid", solverparams.ParameterSet())
         self.thermo_params = pset.get_default("fluid", solverparams.ParameterSet())
+        self.conv_fluid_nodal_T = np.array([])
 
     def solve_receiver(
         self,
@@ -311,7 +312,9 @@ class ThermohydraulicsThermalSolver:
                 )
 
             # Solve for the fluid temperatures
-            nodal_temps = model.solve(time)
+            nodal_temps = model.solve(time, self.conv_fluid_nodal_T)
+            # save these values to use as initial guess in next solve
+            self.conv_fluid_nodal_T = nodal_temps
 
             # Update the stored fluid temperature and flow velocities
             flow_rates, tube_temperatures = model.recover_tube_results(

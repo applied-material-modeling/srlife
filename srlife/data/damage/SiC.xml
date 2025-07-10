@@ -46,12 +46,12 @@
   </base>
   <cares type="StandardModel">
     <threshold_vol>
-      <temperatures>298.15 1073.15 1273.15 1473.15 1673.15 1773.15</temperatures>
-      <values>0.0 0.0 0.0 0.0 0.0 0.0</values>
+      <temperatures>298.15 811.15 1089.15 1366.15 1566.15</temperatures>
+      <values>0.0 0.0 0.0 0.0 0.0</values>
     </threshold_vol>
     <threshold_surf>
-      <temperatures>298.15 1073.15 1273.15 1473.15 1673.15 1773.15</temperatures>
-      <values>0.0 0.0 0.0 0.0 0.0 0.0</values>
+      <temperatures>298.15 811.15 1089.15 1366.15 1566.15</temperatures>
+      <values>0.0 0.0 0.0 0.0 0.0</values>
     </threshold_surf>
     <strength_vol>
       <temperatures>298.15 811.15 1089.15 1366.15 1566.15</temperatures>
