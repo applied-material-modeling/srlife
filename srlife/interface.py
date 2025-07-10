@@ -178,7 +178,7 @@ def apply_tube_flux_bcs(
         list of interpolating functions for heat flux on tubes
     """
     num_steps = len(flux_interpolators_by_hour)
-    tube_theta = np.linspace(0, 2 * np.pi, tube.nt + 1)[:-1]
+    tube_theta = np.linspace(0, 360, tube.nt + 1)[:-1]
     tube_z = np.linspace(0, tube.h, tube.nz)
     # add extra time step for time zero
     tube_flux = np.zeros([num_steps + 1, len(tube_theta), len(tube_z)])
@@ -194,12 +194,12 @@ def apply_tube_flux_bcs(
             # apply across crown so only sunSide gets flux
             for i_theta, theta in enumerate(tube_theta):
                 # for each thetaPt around tube
-                if theta > 270 or theta < 90:
-                    tube_flux[i_hour, i_theta, i_z] = rec_flux[0] * np.cos(
-                        theta * np.pi / 180
+                if 0 < theta < 180:
+                    tube_flux[i_hour + 1, i_theta, i_z] = rec_flux[0] * np.cos(
+                        (theta - 90) * np.pi / 180
                     )
                 else:
-                    tube_flux[i_hour, i_theta, i_z] = 0.0
+                    tube_flux[i_hour + 1, i_theta, i_z] = 0.0
     # make bc object for tube with heat flux data
     # NOTE: this is done here and not in cerate_tube because if we initialize
     # bc data to np.zeros, flux will always be zero unless we reload from a file
@@ -326,12 +326,10 @@ def set_rec_flow_paths(rec, panel_flow_path, mass_flow_per_path, T_in_per_path):
             for tube in panel.tubes.values():
                 # for each tube in panel
                 times = tube.times
-                data_shape = tube.outer_bc.data[:, 0, 0].shape
         # initialize mass flow for path
         mass_flow = mass_flow_per_path[i_path]
         # convert mass flow from kg/s to kg/hr
         mass_flow *= 3600
-        mass_flow *= np.ones(data_shape)
         # set inlet temp
         T_in_flow_path = T_in_per_path[i_path] * np.ones_like(times)
         rec.add_flowpath(flow_path, times, mass_flow, T_in_flow_path)
@@ -416,6 +414,9 @@ def optimize_mass_flow_rate_per_path(
                 check_outlet_temps_and_step_mass_flow(
                     rec, path, path_key, T_out_target, pct_err_outlet_temp, breaker
                 )
+            for panel_key, panel in rec.panels.items():
+                for tube_key, tube in panel.tubes.items():
+                    tube.write_vtk(f"ht-tube-{panel_key}-{tube_key}")
 
         if all(breaker):
             print(f"Converged!!! solved in {i_opt} iterations")
@@ -674,7 +675,35 @@ def calc_p_loss_from_flows_temps(rec, tube_dict, manifold_dict, fluid, outlet_p)
     return flow_path_p_loss
 
 
-def set_tube_pressure_bcs(tubes_dict, tube_pressure, pressure, cyclic_times):
+def update_tube_pressure_bcs(rec, inlet_p_per_path, outlet_p):
+    """
+    Set tube pressure BCs based on pressure loss calc after thm solve
+
+    Args:
+      rec (Receiver): receiver object to set the pressure for
+      inlet_p_per_path (np.array): array of inlet pressures for each flowpath
+      outlet_p (double): outlet pressure, same for all paths
+    """
+    # set tube pressures and temperatures
+    for path_key, path in rec.flowpaths.items():
+        # for each flowpath in the model
+        tube_pressures = np.linspace(
+            inlet_p_per_path[int(path_key)], outlet_p, len(path["panels"]) + 1
+        )[:-1]
+        for i_panel, panel_key in enumerate(path["panels"]):
+            # for each panel in flowpath
+            for tube in rec.panels[panel_key].tubes.values():
+                # for each tube in panel
+                # get tube times
+                times = tube.times
+                pressure = np.ones_like(times)
+                pressure[0] = 0.0
+                tube_pressure = tube_pressures[i_panel] * pressure
+                tube_pressure_bc = receiver.PressureBC(times, tube_pressure)
+                tube.set_pressure_bc(tube_pressure_bc)
+
+
+def cycle_tube_pressure_bcs(tubes_dict, num_cycles, cyclic_times):
     """
     Set pressure bcs on internal face of tube from flow
 
@@ -682,12 +711,25 @@ def set_tube_pressure_bcs(tubes_dict, tube_pressure, pressure, cyclic_times):
       tubes_dict (dict): rec.panels[panel].tubes dictionary tubes from a panel
       tube_pressure (list[double]): pressure values for tubes in a given panel with height
       pressure (list[double]): properly sized array of pressure data to define bc
-      cyclic_times (list[int]): list of times across all cycles of analysis
+      times (list[int]): list of analysis times
 
     """
     for tube in tubes_dict.values():
+        # NOTE: as soon as I cycle results
+        # ghost temp, fluid temp, fluid velocity results are no longer good
+        # so lets delete themo
+        try:
+            tube.quadrature_results.pop("ghost_temperature")
+            tube.axial_results.pop("fluid_temperature")
+            tube.axial_results.pop("fluid_velocity")
+        except KeyError:
+            # We do not need to do anything here, results are already gone
+            pass
         # for each tube in panel
-        tube_pressure *= pressure
+        press_bc = tube.pressure_bc
+        pressure = press_bc.data
+        tube_pressure = np.tile(pressure[1:], num_cycles)
+        tube_pressure = np.append(0, tube_pressure)
         tube_pressure_bc = receiver.PressureBC(cyclic_times, tube_pressure)
         tube.set_pressure_bc(tube_pressure_bc)
 
@@ -722,13 +764,13 @@ def set_and_downsample_tube_temp_bcs(
         T = tube.results["temperature"]
         if set_init_T_to_inlet_T:
             T[0] = inlet_T
-            T[-1] = inlet_T
             tube.T0 = inlet_T
-        _, r2, r3, r4 = np.shape(T)
-        T = np.reshape(
-            np.append(np.tile(T[1:, ...].flatten(), num_cycles), T[0, ...].flatten()),
-            [-1, r2, r3, r4],
-        )
+        _, _, _, r4 = np.shape(T)
+        # this will tile stack all temp results num_cycles times
+        # It does not account for cycle heuristic
+        T_0 = np.array([T[0]])
+        T = np.tile(T[1:], (num_cycles, 1, 1, 1))
+        T = np.append(T_0, T, axis=0)
         tube.results["temperature"] = T
         tube.set_times(cyclic_times)
         T_3d = tube.results["temperature"]
@@ -777,6 +819,7 @@ def process_single_panel_analysis(rec, struct_output_dict, single_panel_analysis
     # update model to use just one panel
     single_panel_model = rec.panels[single_panel_analysis_id]
     rec.panels.clear()
+    rec.flowpaths.clear()
     rec.add_panel(single_panel_model)
 
 
@@ -803,8 +846,6 @@ def run_struct_analysis(
     analysis_type,
     is_single_panel_analysis,
     single_panel_analysis_id,
-    inlet_p,
-    outlet_p,
     num_cycles,
     solver,
     struct_output_dict,
@@ -825,15 +866,12 @@ def run_struct_analysis(
         full receiver
       single_panel_analysis_id (string): name of single panel to analyze if
         is_single_panel_analysis == True
-      inlet_p (list[double]): list of inlet pressures for each flowpath. This
-        list will be updated based on results from this function (Pa)
-      outlet_p (double): pressure at flowpath outlets (Pa)
       num_cycles (double): number of times to repeat load cycles for the analysis
       solver (managers.SolutionManager): system solver for the receiver
       struct_output_dict (dict): dictionary with info about output for st files
         save_to_vtu (bool): save files to vtu output
-        st_fname (string): hdf5 filename for structural output
-        tube_fname (string): filename for vtk output of tube analysis
+        st_filename (string): hdf5 filename for structural output
+        tube_filename (string): filename for vtk output of tube analysis
 
     ToDos:
       rename loc to better name, make it and analysis_type bools?
@@ -843,32 +881,29 @@ def run_struct_analysis(
     rec_struct = receiver.Receiver.load(rec_filename + ".hdf5")
     rec_struct.days *= num_cycles
     inlet_T = rec_struct.flowpaths["0"]["inlet_temp"][0]
-    # times we actually analyze receiver for thm
-    analysis_times = rec_struct.panels["0"].tubes["0"].times[1:]
-    pressure = np.ones(len(analysis_times))
-    # create cyclic time for life
-    cyclic_times = np.tile(analysis_times, num_cycles)
-    pressure = np.tile(pressure, num_cycles)
-    for i_cyc in range(num_cycles):
-        cyclic_times[
-            i_cyc * len(analysis_times) : (i_cyc + 1) * len(analysis_times)
-        ] += (i_cyc * rec_struct.period)
-    # initial steps for pressure and time
-    cyclic_times = np.append([0], cyclic_times)
-    pressure = np.append(0, pressure)
 
     # set tube pressures and temperatures
-    for path_key, path in rec_struct.flowpaths.items():
+    for path in rec_struct.flowpaths.values():
         # for each flowpath in the model
-        tube_pressures = np.linspace(
-            inlet_p[int(path_key)], outlet_p, len(path["panels"]) + 1
-        )[:-1]
-        for i_panel, panel_key in enumerate(path["panels"]):
+        for panel_key in path["panels"]:
             # for each panel in flowpath
-            set_tube_pressure_bcs(
+            # times we actually analyze receiver for thm
+            first_tube = next(iter(rec_struct.panels[panel_key].tubes.values()))
+            analysis_times = first_tube.times[1:]
+            # create cyclic time for life
+            cyclic_times = np.tile(analysis_times, num_cycles)
+            for i_cyc in range(num_cycles):
+                cyclic_times[
+                    i_cyc * len(analysis_times) : (i_cyc + 1) * len(analysis_times)
+                ] += (i_cyc * rec_struct.period)
+            # initial steps for pressure and time
+            cyclic_times = np.append([0], cyclic_times)
+            pressure = np.ones_like(cyclic_times)
+            pressure[0] = 0.0
+
+            cycle_tube_pressure_bcs(
                 rec_struct.panels[panel_key].tubes,
-                tube_pressures[i_panel],
-                pressure,
+                num_cycles,
                 cyclic_times,
             )
             set_and_downsample_tube_temp_bcs(
@@ -890,8 +925,11 @@ def run_struct_analysis(
     solver.solve_structural()
     if struct_output_dict["save_to_vtu"]:
         save_structural_results(
-            rec_struct, struct_output_dict["st_fname"], struct_output_dict["tube_fname"]
+            rec_struct,
+            struct_output_dict["st_filename"],
+            struct_output_dict["tube_filename"],
         )
+    rec_struct.save(rec_filename + "_struct.hdf5")
 
 
 def create_receiver(tube_dict, num_days, times, period, panel_k, num_panels, results):
