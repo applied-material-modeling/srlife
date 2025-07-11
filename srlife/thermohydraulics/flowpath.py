@@ -275,6 +275,11 @@ class FlowPath:
         self.miter = 100
         self.verbose = verbose
 
+        # Save previous solution for use as initial guess
+        # to start, this is empty
+        self.T_prev_sol = np.array([])
+        self.has_prev_conv_T = False
+
     def add_panel(self, weights, ri, h, metal_temp, material):
         """
         Construct and add the standard panel -> manifold link
@@ -342,7 +347,7 @@ class FlowPath:
             self.dof_map.append(list(range(self.nvals, self.nvals + obj.size)))
             self.nvals += obj.size
 
-    def solve(self, t):
+    def solve(self, t, T_init_guess=np.array([])):
         """
         Solve for the current fluid temperatures
 
@@ -353,7 +358,10 @@ class FlowPath:
         self.t = t
 
         # Significant decision...
-        T = np.zeros((self.nvals))
+        if T_init_guess.size != 0:
+            T = T_init_guess
+        else:
+            T = np.zeros((self.nvals))
 
         # Initial residual
         R, J = self.RJ(T)
