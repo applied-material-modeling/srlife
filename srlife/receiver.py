@@ -14,13 +14,15 @@ import scipy.interpolate as inter
 import h5py
 
 # BPM: moose interface
-from subprocess import run
+import subprocess
 import pyhit
 from pyhit import moosetree
 import os
 import sys
-
-ACCESS = os.getenv("ACCESS", "/Users/bmazurowski/miniforge/envs/srlife/seacas")
+conda_env_dir = os.environ.get("CONDA_PREFIX")
+# Needed to use exodus.py
+# NOTE: you will need to change this 
+ACCESS = os.getenv("ACCESS", f"{conda_env_dir}/seacas")
 sys.path.append(os.path.join(ACCESS, "lib"))
 sys.path.append(os.path.join(ACCESS, "lib64"))
 import exodus as exo
@@ -482,7 +484,7 @@ class Receiver:
         closure_node.append("thm_closure", type="Closures1PhaseTHM")
 
         # Functions
-        functions_node = moose_root.append("Functions")
+        moose_root.append("Functions")
         # user objects needed for flux SolutionFunctions
         moose_root.append("UserObjects")
 
@@ -531,7 +533,7 @@ class Receiver:
         if useControls:
             m_dot_fun = "m_dot_time_fun"
             func_node = moosetree.find(moose_root, func=lambda n: n.name == "Functions")
-            if func_node == None:
+            if func_node is None:
                 func_node = moose_root.append("Functions")
             times = np.arange(start_time, end_time, dtmax)
             times = np.append(times, end_time)
@@ -825,10 +827,13 @@ class Receiver:
           moose_input_filename (String): filename to call moose with
 
         """
-        if run(["moose_thm-opt", "-i", moose_input_filename]):
-            print("MOOSE FAILED!!!")
-        else:
-            print("MOOSE FINISHED!!!")
+        try:
+            print("Running MOOSE!")
+            result = subprocess.run(["moose_thm-opt", "-i", moose_input_filename], check=True,
+                         capture_output=False, text=True)
+        except subprocess.CalledProcessError as e:
+            print(f"MOOSE returned error {e.returncode}")
+            print(f"stderr: {e.stderr}")
 
     def get_moose_thm_results(self, moose_input_filenames):
         """
@@ -901,7 +906,8 @@ def read_moose_thm_exodus_file(moose_output_filename):
         if name[0:5] == "panel":
             if "fch_tube" in name:
                 pressure_results = []
-                for iStep, time in enumerate(times):
+                for iStep in range(len(times)):
+                    # NOTE: exodus.py indexes times steps from 1
                     press_data = model.get_variable_values(
                         "EX_ELEM_BLOCK", iElemBlk, "p", iStep + 1
                     )
@@ -916,7 +922,8 @@ def read_moose_thm_exodus_file(moose_output_filename):
                     x, y, z = model.get_coord(node)
                     nodeCoord.append([x, y, z])
 
-                for iStep, time in enumerate(times):
+                for iStep in range(len(times)):
+                    # NOTE: exodus.py indexes times steps from 1
                     temp_data = model.get_variable_values(
                         "EX_NODAL", iElemBlk, "T_solid", iStep + 1
                     )
@@ -1404,8 +1411,7 @@ class Panel:
                 x_tube_prev = tube_xs[iTube - 1]
                 y_tube_prev = tube_ys[iTube - 1]
                 if (
-                    thetas[iTube - 1] < panel_center_theta
-                    and panel_center_theta < thetas[iTube]
+                    thetas[iTube - 1] < panel_center_theta < thetas[iTube]
                 ):
                     # this connector crosses centerline
                     self.create_moose_thm_split_connector_tube(
@@ -1546,7 +1552,7 @@ def add_tube_to_moose_thm_jct(panel_node, jct_name, tube_name, tube_in_out):
       tube_in_out (string): specifies tube_name:in or :out connection
     """
     jct_node = moosetree.find(panel_node, func=lambda n: n.name == jct_name)
-    if jct_node == None:
+    if jct_node is None:
         print(f"COULD NOT FIND JCT!!! {jct_name}")
         # BPMToDo: better error handling here
         sys.exit()
@@ -2343,12 +2349,18 @@ class Tube:
             transform="TRANSLATE",
             vector_value=make_moose_hit_vector([x_tube, y_tube, 0.0]),
         )
-        output_node = tube_mesh_root.append("Outputs", exodus="true")
+        tube_mesh_root.append("Outputs", exodus="true")
         # write tube input to a file
         tube_mesh_moose_input = f"{panel_node.name}_tube_{tube_num}"
         pyhit.write(tube_mesh_moose_input + ".i", tube_mesh_root)
         # run moose to generate tube mesh
-        run(["moose_thm-opt", "-i", tube_mesh_moose_input + ".i", "--mesh-only"])
+        try:
+            result = subprocess.run(["moose_thm-opt", "-i", tube_mesh_moose_input + ".i", "--mesh-only"],
+                                    check=True, capture_output=True, text=True)
+        except subprocess.CalledProcessError as e:
+            print(f"MOOSE returned error {e.returncode}")
+            print(f"stderr: {e.stderr}")
+
         # if this runs, then output file will be below
         tube_mesh_file = f"{tube_mesh_moose_input}_in.e"
         # now I want to write flux bc data to this exodus file
@@ -2397,21 +2409,18 @@ class Tube:
         # we only want to operate on each node once
         flux_bc_nodes = np.unique(flux_bc_nodes)
         flux_data = np.zeros((len(self.times), model.num_nodes()))
-        count = 0
         for node in flux_bc_nodes:
             # get coords in MOOSE x,y,z coordinates (expects node index)
             x, y, z = model.get_coord(node)
             coord = np.array([x, y, z])
             # get srlife tube coords (note: could just map coords)
-            r, theta, z = self.map_moose_coords_to_srlife_tube_coords(coord)
+            _, theta, z = self.map_moose_coords_to_srlife_tube_coords(coord)
             z_tube = convert_m_to_mm(z)
             for iTime, time in enumerate(self.times):
                 # Get the correct value of flux
                 flux_data[iTime, node - 1] = convert_Wmm2_to_Wm2(
                     self.outer_bc.flux(time, theta, z_tube)
                 )
-            if flux_data[iTime, node - 1] == 0.0:
-                count += 1
         # make all times and variables in exodus
         for iTime, time in enumerate(self.times):
             model.put_time(iTime + 1, time * 3600)
@@ -2572,9 +2581,6 @@ class Tube:
                 for iZ, z_hat in enumerate(z_hats):
                     x[iX], _, z = self.map_tube_coords_to_moose_thm_coords(
                         x_hat, y_hat, z_hat
-                    )
-                    flux = convert_Wmm2_to_Wm2(
-                        bc.flux(time / 3600, theta, convert_m_to_mm(z))
                     )
                     hour_data[iX, iZ] = convert_Wmm2_to_Wm2(
                         bc.flux(time / 3600, theta, convert_m_to_mm(z))
