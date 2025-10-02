@@ -818,7 +818,7 @@ class Receiver:
             filenames.append(moose_flow_path_filename)
         return filenames
 
-    def run_moose_thm_model(self, moose_exec, moose_input_filename):
+    def run_moose_thm_model(self, moose_input_filename):
         """
         Runs the MOOSE THM model using inputs
 
@@ -829,8 +829,11 @@ class Receiver:
         """
         try:
             print("Running MOOSE!")
-            result = subprocess.run(["moose_thm-opt", "-i", moose_input_filename], check=True,
-                         capture_output=False, text=True)
+            mpirun = os.environ.get("MOOSE_MPI")
+            moose_thm = os.environ.get("MOOSE_THM")
+            argv = [mpirun, moose_thm, "-i", moose_input_filename]
+            result = subprocess.run(argv,
+                                    check=True, capture_output=False, text=True)
         except subprocess.CalledProcessError as e:
             print(f"MOOSE returned error {e.returncode}")
             print(f"stderr: {e.stderr}")
@@ -2355,7 +2358,8 @@ class Tube:
         pyhit.write(tube_mesh_moose_input + ".i", tube_mesh_root)
         # run moose to generate tube mesh
         try:
-            result = subprocess.run(["moose_thm-opt", "-i", tube_mesh_moose_input + ".i", "--mesh-only"],
+            moose_exec = os.environ.get("MOOSE_THM", "MOOSE_THM")
+            result = subprocess.run([moose_exec, "-i", tube_mesh_moose_input + ".i", "--mesh-only"],
                                     check=True, capture_output=True, text=True)
         except subprocess.CalledProcessError as e:
             print(f"MOOSE returned error {e.returncode}")
