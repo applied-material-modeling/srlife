@@ -1151,7 +1151,7 @@ class Panel:
             f"{panel_node.name}/{bot_connector_tube_2_name}:in",
         ]
         panel_node.append(
-            f"jct_{panel_node.name}_tube_in",
+            f"jct_{panel_node.name}_t_in",
             type="VolumeJunction1Phase",
             position=make_moose_hit_vector([midpoint[0], midpoint[1], 0]),
             volume=A_pipe * 2.0,
@@ -1226,7 +1226,7 @@ class Panel:
             f"{panel_node.name}/{panel_out_tube_name}:in",
         ]
         panel_node.append(
-            f"jct_{panel_node.name}_tube_out",
+            f"jct_{panel_node.name}_t_out",
             type="VolumeJunction1Phase",
             position=make_moose_hit_vector([midpoint[0], midpoint[1], tube_height]),
             volume=A_pipe * 2.0,
