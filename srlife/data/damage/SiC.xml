@@ -88,4 +88,100 @@
       <values>520 520 750 210 210</values>
     </fatigue_Bs>
   </cares>
+  <tested_2P type="StandardModel">
+    <threshold_vol>
+      <temperatures>298.15 873.15 1073.15 1273.15</temperatures>
+      <values>0.0 0.0 0.0 0.0</values>
+    </threshold_vol>
+    <threshold_surf>
+      <temperatures>298.15 873.15 1073.15 1273.15</temperatures>
+      <values>0.0 0.0 0.0 0.0</values>
+    </threshold_surf>
+    <strength_vol>
+      <temperatures>298.15 873.15 1073.15 1273.15</temperatures>
+      <values>515.3 515.3 515.3 515.3</values>
+    </strength_vol>
+    <strength_surf>
+      <temperatures>298.15 873.15 1073.15 1273.15</temperatures>
+      <values>711.8 711.8 711.8 711.8</values>
+    </strength_surf>
+    <modulus_vol>
+      <temperatures>298.15 873.15 1073.15 1273.15</temperatures>
+      <values>8.29 8.29 8.29 8.29</values>
+    </modulus_vol>
+    <modulus_surf>
+      <temperatures>298.15 873.15 1073.15 1273.15</temperatures>
+      <values>6.75 6.75 6.75 6.75</values>
+    </modulus_surf>
+    <c_bar>0.82</c_bar>
+    <nu>0.16</nu>
+    <fatigue_Nv>
+      <temperatures>298.15 873.15 1073.15 1273.15</temperatures>
+      <values>63.65 63.65 63.65 63.65</values>
+      <!--values>60.93 60.93 60.93 60.93</values-->
+    </fatigue_Nv>
+    <fatigue_Ns>
+      <temperatures>298.15 873.15 1073.15 1273.15</temperatures>
+      <values>63.65 63.65 63.65 63.65</values>
+      <!--values>60.93 60.93 60.93 60.93</values-->
+    </fatigue_Ns>
+    <fatigue_Bv>
+      <temperatures>298.15 873.15 1073.15 1273.15</temperatures>
+      <values>14.29 2.84 2.84 2.84</values>
+      <!--values>11.38 1.21 8.93 8.93</values-->
+    </fatigue_Bv>
+    <fatigue_Bs>
+      <temperatures>298.15 873.15 1073.15 1273.15</temperatures>
+      <values>14.29 2.84 2.84 2.84</values>
+      <!--values>11.38 1.21 8.93 8.93</values-->
+    </fatigue_Bs>
+  </tested_2P>
+  <tested_3P type="StandardModel">
+    <threshold_vol>
+      <temperatures>298.15 873.15 1073.15 1273.15</temperatures>
+      <values>252.2 252.2 252.2 252.2</values>
+    </threshold_vol>
+    <threshold_surf>
+      <temperatures>298.15 873.15 1073.15 1273.15</temperatures>
+      <values>191.9 191.9 191.9 191.9</values>
+    </threshold_surf>
+    <strength_vol>
+      <temperatures>298.15 873.15 1073.15 1273.15</temperatures>
+      <values>1690.2 1690.2 1690.2 1690.2</values>
+    </strength_vol>
+    <strength_surf>
+      <temperatures>298.15 873.15 1073.15 1273.15</temperatures>
+      <values>1291.6 1291.6 1291.6 1291.6</values>
+    </strength_surf>
+    <modulus_vol>
+      <temperatures>298.15 873.15 1073.15 1273.15</temperatures>
+      <values>1.11 1.11 1.11 1.11</values>
+    </modulus_vol>
+    <modulus_surf>
+      <temperatures>298.15 873.15 1073.15 1273.15</temperatures>
+      <values>2.02 2.02 2.02 2.02</values>
+    </modulus_surf>
+    <c_bar>0.82</c_bar>
+    <nu>0.16</nu>
+    <fatigue_Nv>
+      <temperatures>298.15 873.15 1073.15 1273.15</temperatures>
+      <values>63.65 63.65 63.65 63.65</values>
+      <!--values>60.93 60.93 60.93 60.93</values-->
+    </fatigue_Nv>
+    <fatigue_Ns>
+      <temperatures>298.15 873.15 1073.15 1273.15</temperatures>
+      <values>63.65 63.65 63.65 63.65</values>
+      <!--values>60.93 60.93 60.93 60.93</values-->
+    </fatigue_Ns>
+    <fatigue_Bv>
+      <temperatures>298.15 873.15 1073.15 1273.15</temperatures>
+      <values>14.29 2.84 2.84 2.84</values>
+      <!--values>11.38 1.21 8.93 8.93</values-->
+    </fatigue_Bv>
+    <fatigue_Bs>
+      <temperatures>298.15 873.15 1073.15 1273.15</temperatures>
+      <values>14.29 2.84 2.84 2.84</values>
+      <!--values>11.38 1.21 8.93 8.93</values-->
+    </fatigue_Bs>
+  </tested_3P>
 </models>
