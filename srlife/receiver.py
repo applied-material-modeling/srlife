@@ -13,12 +13,27 @@ import numpy as np
 import scipy.interpolate as inter
 import h5py
 
-# BPM: moose interface
 import subprocess
+import os
+import sys 
+
+# Get absolute paths to moose python modules
+current_dir = os.path.dirname(os.path.abspath(__file__))
+repo_root = os.path.dirname(current_dir)  # go up one level
+moose_root = os.path.join(repo_root, 'moose') # go to moose directory
+# Add moose python paths for pyhit
+moose_python_paths = [
+    os.path.join(moose_root, 'python'),
+    os.path.join(moose_root, 'python', 'pyhit'),
+    os.path.join(moose_root, 'framework', 'contrib', 'hit'),
+]
+
+for path in moose_python_paths:
+    if os.path.exists(path) and path not in sys.path:
+        sys.path.insert(0, path)
+
 import pyhit
 from pyhit import moosetree
-import os
-import sys
 conda_env_dir = os.environ.get("CONDA_PREFIX")
 # Needed to use exodus.py
 # NOTE: you will need to change this 
@@ -830,8 +845,9 @@ class Receiver:
         try:
             print("Running MOOSE!")
             mpirun = os.environ.get("MOOSE_MPI")
+            nprocs = os.environ.get("MOOSE_NPROCS")
             moose_thm = os.environ.get("MOOSE_THM")
-            argv = [mpirun, moose_thm, "-i", moose_input_filename]
+            argv = [mpirun, "-n", nprocs, moose_thm, "-i", moose_input_filename]
             result = subprocess.run(argv,
                                     check=True, capture_output=False, text=True)
         except subprocess.CalledProcessError as e:
