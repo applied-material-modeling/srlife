@@ -319,7 +319,7 @@ class Receiver:
         # find in/out tubes from panels
         prev_panel_tube_name = f"fch_{prev_panel_node.name}_"
         panel_tube_name = f"fch_{panel_node.name}_"
-        if pos == "1":
+        if pos == "bot":
             in_out_string = "in"
         else:
             in_out_string = "out"
@@ -347,7 +347,7 @@ class Receiver:
         tube_pos = str(panel_tube["position"])
         tube_end = np.fromstring(tube_pos, dtype=float, sep=" ")
         # adjust connector tubes to match correct height for top tubes
-        if pos == "2":
+        if pos == "top":
             tube_start[2] += in_out_tube_height
             tube_end[2] += in_out_tube_height
         orientation = tube_end - tube_start
@@ -757,7 +757,7 @@ class Receiver:
                     )
                     if iPanel % 2 == 0:
                         # even panel, connect bot
-                        pos = "1"
+                        pos = "bot"
                         self.create_moose_thm_panel_to_panel_connection(
                             comp_node,
                             panel_node,
@@ -768,7 +768,7 @@ class Receiver:
                         )
                     else:
                         # odd panel, connect top
-                        pos = "2"
+                        pos = "top"
                         self.create_moose_thm_panel_to_panel_connection(
                             comp_node,
                             panel_node,
@@ -2332,8 +2332,8 @@ class Tube:
             heights=make_moose_hit_vector([1, 1, h]),
             num_layers=make_moose_hit_vector([0, 0, (self.nz - 1)]),
             direction=make_moose_hit_vector([0, 0, 1]),
-            bottom_boundary="1",
-            top_boundary="2",
+            bottom_boundary="bot",
+            top_boundary="top",
         )
 
         # rotate tube
