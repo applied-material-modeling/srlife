@@ -1,12 +1,21 @@
 import os
+import sys
 import subprocess
 from pathlib import Path
 import numpy as np
 import netCDF4 as nc
 import re
 import pyhit
-from srlife import receiver 
+from srlife import receiver
 from srlife.receiver import make_moose_hit_vector
+from srlife.interface import convert_m_to_mm
+
+conda_env_dir = os.environ.get("CONDA_PREFIX")
+ACCESS = os.getenv("ACCESS", f"{conda_env_dir}/seacas")
+sys.path.append(os.path.join(ACCESS, "lib"))
+import exodus as exo
+
+SQRT2 = np.sqrt(2.0)
 
 
 def find_pin_coords(mesh_file, tol=1e-6):
@@ -312,3 +321,140 @@ def build_structural_input(panel: int, tubes: list, flowpath: int, times, out_di
         outputs.append("csv_out", type="CSV", file_base=output_base)
 
         return root, i_name
+
+
+def get_element_temperatures(model, conn, i_step):
+        # Element-averaged temperature (K) at exodus 1-based step i_step
+        temp_all = model.get_variable_values("EX_NODAL", 0, "temp", i_step)
+        return np.mean(temp_all[conn - 1], axis=1)
+
+
+def read_tube_stress_and_temp(model, blk_id, conn, times):
+        # Mandel-form Cauchy stress (ntime, nelem, 6) and element-averaged
+        # temperatures (ntime, nelem) for one HEX8 tube block in a MOOSE
+        # structural exodus
+        n_times = len(times)
+        n_elem = conn.shape[0]
+        mandel_stress = np.zeros((n_times, n_elem, 6))
+        temperatures = np.zeros((n_times, n_elem))
+        stress_vars = [
+            "cauchy_stress_xx", "cauchy_stress_yy", "cauchy_stress_zz",
+            "cauchy_stress_yz", "cauchy_stress_xz", "cauchy_stress_xy",
+        ]
+        mandel_mult = np.array([1.0, 1.0, 1.0, SQRT2, SQRT2, SQRT2])
+        for t_idx in range(n_times):
+                i_step = t_idx + 1
+                for s_idx, var_name in enumerate(stress_vars):
+                        s_vals = model.get_variable_values(
+                            "EX_ELEM_BLOCK", blk_id, var_name, i_step
+                        )
+                        mandel_stress[t_idx, :, s_idx] = s_vals * mandel_mult[s_idx]
+                temperatures[t_idx] = get_element_temperatures(model, conn, i_step)
+        return mandel_stress, temperatures
+
+
+def compute_moose_reliability(rec, mat_damage, damage_model, lifetime,
+                              moose_sm_output_files, tube_multiplier):
+        """Read MOOSE structural exodus output and returns reliability using srlife's models.
+
+        Args:
+                rec: srlife Receiver.
+                mat_damage: material damage model variant.
+                damage_model: srlife damage model (e.g. PIAModel).
+                lifetime: float, hours.
+                moose_sm_output_files: list of paths to MOOSE SM exodus files
+                tube_multiplier: float, scaling from analysis tubes to actual
+                        tubes for per-panel
+
+        Returns a dict that the driver script can use:
+            {
+              "lifetime": float,
+              "tube_volume": [ ], "tube_surface": [ ], "tube_combined": [ ],
+              "panel_volume": [ ], "panel_surface": [ ], "panel_combined": [ ],
+              "overall_volume": float, "overall_surface": float, "overall_combined": float,
+            }
+        """
+        m3_to_mm3 = convert_m_to_mm(1.0) ** 3
+        m2_to_mm2 = convert_m_to_mm(1.0) ** 2
+
+        # One representative tube 
+        sample_tube = next(iter(next(iter(rec.panels.values())).tubes.values()))
+        nt, nz = sample_tube.nt, sample_tube.nz
+
+        volumes = sample_tube.element_volumes() * m3_to_mm3
+        surface, normals = sample_tube.surface_elements()
+
+        # element_surface_areas() ships (z, t) per side; surface mask is (r, t, z)
+        # with z fastest -- transpose each side so areas align with the mask.
+        sa_raw = sample_tube.element_surface_areas()
+        half = (nz - 1) * nt
+        inner_sa = sa_raw[:half].reshape(nz - 1, nt).T.flatten()
+        outer_sa = sa_raw[half:].reshape(nz - 1, nt).T.flatten()
+        surface_areas = np.concatenate([inner_sa, outer_sa]) * m2_to_mm2
+
+        # Reorder so surface elements come first -- workaround for srlife's
+        # damage.py [:count_surface_elements] slicing in the surface-flaw call.
+        sort_order = np.argsort(~surface)
+        volumes_r = volumes[sort_order]
+        surface_r = surface[sort_order]
+        normals_r = normals[sort_order]
+
+        per_panel_tube_results = []
+        for sm_exo_path in moose_sm_output_files:
+                model = exo.exodus(str(sm_exo_path), array_type="numpy")
+                times = np.asarray(model.get_times())
+                times_hr = times / 3600.0 # in moose solution the time is in seconds, here we need hours.
+                tube_results = []
+                for blk_id in model.get_elem_blk_ids():
+                        conn_flat, num_elem, npe = model.get_elem_connectivity(blk_id)
+                        if npe != 8:
+                                continue
+                        conn = np.array(conn_flat, dtype=int).reshape(num_elem, npe)
+                        mandel_stress, temperatures = read_tube_stress_and_temp(
+                            model, blk_id, conn, times
+                        )
+                        mandel_stress = mandel_stress[:, sort_order]
+                        temperatures = temperatures[:, sort_order]
+                        vol_log_rel = damage_model.calculate_volume_flaw_element_log_reliability(
+                            times_hr, mandel_stress, temperatures, volumes_r,
+                            mat_damage, lifetime,
+                        )
+                        surf_log_rel = damage_model.calculate_surface_flaw_element_log_reliability(
+                            times_hr, mandel_stress, surface_r, normals_r,
+                            temperatures, surface_areas, mat_damage, lifetime,
+                        )
+                        combined_log_rel = vol_log_rel.copy()
+                        combined_log_rel[np.where(surface_r)[0]] += surf_log_rel
+                        tube_results.append({
+                            "volume":   float(np.sum(vol_log_rel)),
+                            "surface":  float(np.sum(surf_log_rel)),
+                            "combined": float(np.sum(combined_log_rel)),
+                        })
+                model.close()
+                per_panel_tube_results.append(tube_results)
+
+        all_vol  = np.array([r["volume"]   for tubes in per_panel_tube_results for r in tubes])
+        all_surf = np.array([r["surface"]  for tubes in per_panel_tube_results for r in tubes])
+        all_comb = np.array([r["combined"] for tubes in per_panel_tube_results for r in tubes])
+
+        panel_volume, panel_surface, panel_combined = [], [], []
+        idx = 0
+        for tubes in per_panel_tube_results:
+                n = len(tubes)
+                panel_volume.append(float(np.exp(np.sum(all_vol[idx:idx + n]  * tube_multiplier))))
+                panel_surface.append(float(np.exp(np.sum(all_surf[idx:idx + n] * tube_multiplier))))
+                panel_combined.append(float(np.exp(np.sum(all_comb[idx:idx + n] * tube_multiplier))))
+                idx += n
+
+        return {
+            "lifetime": lifetime,
+            "tube_volume":    [float(v) for v in np.exp(all_vol)],
+            "tube_surface":   [float(v) for v in np.exp(all_surf)],
+            "tube_combined":  [float(v) for v in np.exp(all_comb)],
+            "panel_volume":   panel_volume,
+            "panel_surface":  panel_surface,
+            "panel_combined": panel_combined,
+            "overall_volume":   float(np.exp(np.sum(all_vol  * tube_multiplier))),
+            "overall_surface":  float(np.exp(np.sum(all_surf * tube_multiplier))),
+            "overall_combined": float(np.exp(np.sum(all_comb * tube_multiplier))),
+        }
