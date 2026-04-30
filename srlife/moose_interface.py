@@ -103,7 +103,7 @@ def run_moose_sm_model(moose_input_filename):
             mpirun = os.environ.get("MOOSE_MPI")
             nprocs = os.environ.get("MOOSE_NPROCS")
             # TODO: Write a small NEML app and replace the usage of full Deer here
-            moose_sm = os.environ.get("DEER") 
+            moose_sm = os.environ.get("NEMLAPP") 
             argv = [mpirun, "-n", nprocs, moose_sm, "-i", moose_input_filename]
             result = subprocess.run(argv,
                                     check=True, capture_output=False, text=True)
