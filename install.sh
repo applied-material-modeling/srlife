@@ -57,8 +57,8 @@ if [[ "$BUILD_MOOSE" == "true" ]]; then
     cd $SRLIFE_DIR/moose/modules/thermal_hydraulics/
     make -j$MOOSE_JOBS
     
-    echo "Installing Solid Mechanics module..."
-    cd $SRLIFE_DIR/moose/modules/solid_mechanics/
+    echo "Installing nemlapp for solid mechanics..."
+    cd $SRLIFE_DIR/nemlapp
     make -j$MOOSE_JOBS
 fi
 
