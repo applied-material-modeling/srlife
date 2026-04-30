@@ -1,0 +1,26 @@
+.libs
+*-opt
+*-dbg
+*.so
+*.so.*
+*.la
+*.lo
+*.lo.d
+build
+lib
+test/lib
+*.yaml
+
+# MOOSE outputs
+*.e
+*.exo
+*.csv
+*print_trace.*
+*.previous_test_results.json
+
+# Editor junk
+*.swp
+*~
+\#*\#
+.DS_Store
+.vscode
