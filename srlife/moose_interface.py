@@ -39,6 +39,7 @@ def find_pin_coords(mesh_file, tol=1e-6):
 
 
 PANEL_BLOCK_RE = re.compile(r"panel_(\d+)/")
+FCH_TUBE_BLOCK_RE = re.compile(r"panel_(\d+)/fch_tube_(\d+)$")
 
 
 def panels_in_thm_exodus(exo_path):
@@ -73,6 +74,39 @@ def discover_tubes(panel: int, out_dir: Path):
         return sorted(ids)
 
 
+def extract_thm_pressures_to_dat(thm_exo_path, out_dir):
+        # For each panel_X/fch_tube_Y block in the THM exodus, write
+        # panel_X_fch_tube_Y_p.dat (AXIS Z / AXIS T / DATA, pressure in MPa).
+        out_dir = Path(out_dir)
+        model = exo.exodus(str(thm_exo_path), array_type="numpy")
+        times = model.get_times()
+        for blk_id in model.get_elem_blk_ids():
+                blk_name = model.get_elem_blk_name(blk_id)
+                m = FCH_TUBE_BLOCK_RE.match(blk_name)
+                if not m:
+                        continue
+                panel, tube = int(m.group(1)), int(m.group(2))
+                conn, num_elem, num_nodes = model.get_elem_connectivity(blk_id)
+                conn = np.array(conn, dtype=int).reshape((num_elem, num_nodes))
+                z_vals = np.array([
+                        np.mean([model.get_coord(nid)[2] for nid in elem_nodes])
+                        for elem_nodes in conn
+                ])
+                order = np.argsort(z_vals)
+                out_path = out_dir / f"panel_{panel}_fch_tube_{tube}_p.dat"
+                with open(out_path, "w", encoding="utf-8") as f:
+                        f.write(f"# Pressure from block {blk_name} variable p\n")
+                        f.write("AXIS Z\n")
+                        f.write(" ".join(f"{v:.16g}" for v in z_vals[order]) + "\n")
+                        f.write("AXIS T\n")
+                        f.write(" ".join(f"{t:.16g}" for t in times) + "\n")
+                        f.write("DATA\n")
+                        for step in range(len(times)):
+                                p_vals = model.get_variable_values("EX_ELEM_BLOCK", blk_id, "p", step + 1)
+                                f.write(" ".join(f"{v:.16g}" for v in np.array(p_vals)[order] / 1e6) + "\n")
+        model.close()
+
+
 def create_moose_sm_inputs(moose_thm_filename, out_dir=None):
         """
         Creates MOOSE Solid Mechanics input files for each receiver panel based on the THM results.
@@ -92,6 +126,7 @@ def create_moose_sm_inputs(moose_thm_filename, out_dir=None):
         for fp in (0, 1):
                 exo_path = out_dir / f"{moose_thm_filename}_flowpath_{fp}_exo.e"
                 times = read_time_axis(exo_path)
+                extract_thm_pressures_to_dat(exo_path, out_dir)
                 for panel in panels_in_thm_exodus(exo_path):
                         tubes = discover_tubes(panel, out_dir)
                         root, i_name = build_structural_input(
