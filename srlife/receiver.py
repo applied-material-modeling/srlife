@@ -1503,12 +1503,7 @@ def make_moose_hit_vector(list_in):
     Args: list_in (list): the python list to convert
     Returns: a vector in moose hit form
     """
-    vec_string = "'"
-    sep = " "
-    for val in list_in:
-        vec_string += f"{val}{sep}"
-    vec_string += "'"
-    return vec_string
+    return "'" + " ".join(str(v) for v in list_in) + "'"
 
 
 def convert_mm_to_m(mm_in):
