@@ -36,7 +36,6 @@ import pyhit
 from pyhit import moosetree
 conda_env_dir = os.environ.get("CONDA_PREFIX")
 # Needed to use exodus.py
-# NOTE: you will need to change this 
 ACCESS = os.getenv("ACCESS", f"{conda_env_dir}/seacas")
 sys.path.append(os.path.join(ACCESS, "lib"))
 sys.path.append(os.path.join(ACCESS, "lib64"))
