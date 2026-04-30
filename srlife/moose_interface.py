@@ -72,9 +72,14 @@ def create_moose_sm_inputs(moose_thm_filename, out_dir=None):
         Args:
                 moose_thm_filename (String): base filename of the MOOSE THM Exodus outputs
                 out_dir (String, optional): directory where THM exodus files are located. This is also where the structural input files will be written. Defaults to current working directory.
+
+        Returns:
+                (input_paths, output_exodus_paths): input_paths are the .i files for moose sm
+                output_exodus_paths are the .e files for compute_moose_reliability.
         """
         out_dir = Path(out_dir) if out_dir is not None else Path.cwd()
-        written = []
+        input_paths = []
+        output_exodus_paths = []
         for fp in (0, 1):
                 exo_path = out_dir / f"{moose_thm_filename}_flowpath_{fp}_exo.e"
                 times = read_time_axis(exo_path)
@@ -85,8 +90,13 @@ def create_moose_sm_inputs(moose_thm_filename, out_dir=None):
                         )
                         input_path = out_dir / i_name
                         pyhit.write(str(input_path), root)
-                        written.append(input_path)
-        return written
+                        input_paths.append(input_path)
+                        # build_structural_input writes the [Outputs/exodus_out] file_base
+                        # as panel_{P}_struct_from_fp{F}; MOOSE appends .e
+                        output_exodus_paths.append(
+                                out_dir / f"panel_{panel}_struct_from_fp{fp}.e"
+                        )
+        return input_paths, output_exodus_paths
 
 def run_moose_sm_model(moose_input_filename):
         """
