@@ -8,14 +8,14 @@
 
 import itertools
 from collections import OrderedDict
-
+import subprocess
+import os
+import sys 
 import numpy as np
 import scipy.interpolate as inter
 import h5py
 
-import subprocess
-import os
-import sys 
+
 
 # Get absolute paths to moose python modules
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -32,14 +32,14 @@ for path in moose_python_paths:
     if os.path.exists(path) and path not in sys.path:
         sys.path.insert(0, path)
 
-import pyhit
-from pyhit import moosetree
+import pyhit # pylint: disable=import-error
+from pyhit import moosetree # pylint: disable=import-error
 conda_env_dir = os.environ.get("CONDA_PREFIX")
 # Needed to use exodus.py
 ACCESS = os.getenv("ACCESS", f"{conda_env_dir}/seacas")
 sys.path.append(os.path.join(ACCESS, "lib"))
 sys.path.append(os.path.join(ACCESS, "lib64"))
-import exodus as exo
+import exodus as exo # pylint: disable=import-error
 
 
 from srlife import writers

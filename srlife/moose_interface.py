@@ -12,7 +12,7 @@ import re
 import subprocess
 from pathlib import Path
 import numpy as np
-import netCDF4 as nc
+import netCDF4 as nc # pylint: disable=import-error
 import pyhit  # pylint: disable=import-error
 from srlife.receiver import make_moose_hit_vector
 from srlife.interface import convert_m_to_mm
