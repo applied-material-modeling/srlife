@@ -1,3 +1,11 @@
+"""
+This module provides functions to interface between srlife and MOOSE.
+It has functions to read MOOSE THM results, create MOOSE structural input files, 
+run the MOOSE structural model, and compute reliability from MOOSE structural outputs 
+using srlife's damage models.
+
+"""
+
 import os
 import sys
 import subprocess
@@ -19,8 +27,17 @@ SQRT2 = np.sqrt(2.0)
 
 
 def find_pin_coords(mesh_file, tol=1e-6):
-    # Two diametrically-opposite outer-radius nodes on the bottom face.
-    # This helps pin the bottom face without restricting the axial expansion
+    """ 
+    Two diametrically-opposite outer-radius nodes on the bottom face. 
+    This helps pin the bottom face without restricting the axial expansion
+
+    Args:
+        mesh_file: path to the tube mesh exodus file
+        tol: tolerance for coordinate comparisons
+    
+    Returns:
+        (xa, ya, za), (xb, yb, zb): coordinates of the two pin nodes.
+         """
     with nc.Dataset(mesh_file, "r") as exo:
         x = np.array(exo.variables["coordx"][:])
         y = np.array(exo.variables["coordy"][:])
@@ -43,7 +60,13 @@ FCH_TUBE_BLOCK_RE = re.compile(r"panel_(\d+)/fch_tube_(\d+)$")
 
 
 def panels_in_thm_exodus(exo_path):
-    # Read panel names in the THM output
+    """
+    Reads the THM exodus file and returns a sorted list of panel numbers present in the file.
+    
+    Args:
+        exo_path: path to the THM exodus file
+    Returns:
+        A sorted list of panel numbers (integers) found in the exodus file."""
     with nc.Dataset(exo_path, "r") as exo:
         raw = exo.variables["eb_names"][:]
     names = ["".join(c.decode() for c in row if c).strip() for row in raw]
@@ -56,12 +79,27 @@ def panels_in_thm_exodus(exo_path):
 
 
 def read_time_axis(thm_exodus: Path):
+    """
+    Reads the time axis from the THM exodus file.
+
+    Args:
+        thm_exodus: Path to the THM exodus file
+
+    Returns:
+        A list of time values.
+    """
     with nc.Dataset(thm_exodus, "r") as exo:
         return list(exo.variables["time_whole"][:])
 
 def discover_tubes(panel: int, out_dir: Path):
-    # Find tube IDs by globbing panel_{panel}_tube_*_in.e in out_dir
-
+    """
+    Find tube IDs by globbing panel_{panel}_tube_*_in.e in out_dir
+    Args:
+        panel: int, panel number
+        out_dir: Path, directory to search for tube meshes
+    Returns:
+        A sorted list of tube IDs (integers) found in the directory.
+    """
     pattern = f"panel_{panel}_tube_*_in.e"
     files = sorted(out_dir.glob(pattern))
     if not files:
@@ -75,8 +113,13 @@ def discover_tubes(panel: int, out_dir: Path):
 
 
 def extract_thm_pressures_to_dat(thm_exo_path, out_dir):
-    # For each panel_X/fch_tube_Y block in the THM exodus, write
-    # panel_X_fch_tube_Y_p.dat (AXIS Z / AXIS T / DATA, pressure in MPa).
+    """ For each panel_X/fch_tube_Y block in the THM exodus, write
+     panel_X_fch_tube_Y_p.dat (AXIS Z / AXIS T / DATA, pressure in MPa).
+     
+     Args:
+        thm_exo_path: path to the THM exodus file
+        out_dir: directory where the .dat files will be written
+     """
     out_dir = Path(out_dir)
     model = exo.exodus(str(thm_exo_path), array_type="numpy")
     times = model.get_times()
@@ -114,7 +157,9 @@ def create_moose_sm_inputs(moose_thm_filename, out_dir=None):
 
     Args:
         moose_thm_filename (String): base filename of the MOOSE THM Exodus outputs
-        out_dir (String, optional): directory where THM exodus files are located. This is also where the structural input files will be written. Defaults to current working directory.
+        out_dir (String, optional): directory where THM exodus files are located. 
+        This is also where the structural input files will be written. Defaults to 
+        current working directory.
 
     Returns:
         (input_paths, output_exodus_paths): input_paths are the .i files for moose sm
@@ -166,8 +211,21 @@ def run_moose_sm_model(moose_input_filename):
         print(f"stderr: {e.stderr}")
 
 def build_structural_input(panel: int, tubes: list, flowpath: int, times, out_dir: Path, moose_thm_filename: str):
-    # Build the structural solution file for receiver panel by panel
+    """
+    Build the structural solution file for receiver panel by panel.
 
+    Args:
+        panel: int, panel number
+        tubes: list, list of tube IDs
+        flowpath: int, flow path number
+        times: list, time values
+        out_dir: Path, directory where the structural input file will be written
+        moose_thm_filename: str, base filename of the MOOSE THM Exodus outputs
+
+    Returns:
+        root: pyhit.Node, used to write the MOOSE input file
+        i_name: str, the name of the structural input file
+    """
     thm_file = f"{moose_thm_filename}_flowpath_{flowpath}_exo.e"
     output_base = f"panel_{panel}_struct_from_fp{flowpath}"
     i_name = f"moose_structural_panel_{panel}_from_fp{flowpath}.i"
@@ -359,15 +417,35 @@ def build_structural_input(panel: int, tubes: list, flowpath: int, times, out_di
 
 
 def get_element_temperatures(model, conn, i_step):
-    # Element-averaged temperature (K) at exodus 1-based step i_step
+    """
+    Element-averaged temperature (K) at exodus 1-based step i_step
+   
+    Args:  
+        model: exodus model object
+        conn: element connectivity matrix for the block (nelem, 8)
+        i_step: 1-based step index in the exodus file
+    Returns:
+        temperatures: element-averaged temperatures (nelem,)
+    """
+
     temp_all = model.get_variable_values("EX_NODAL", 0, "temp", i_step)
     return np.mean(temp_all[conn - 1], axis=1)
 
 
 def read_tube_stress_and_temp(model, blk_id, conn, times):
-    # Mandel-form Cauchy stress (ntime, nelem, 6) and element-averaged
-    # temperatures (ntime, nelem) for one HEX8 tube block in a MOOSE
-    # structural exodus
+    """ Mandel-form Cauchy stress (ntime, nelem, 6) and element-averaged
+     temperatures (ntime, nelem) for one HEX8 tube block in a MOOSE
+     structural exodus
+     
+        Args:
+            model: exodus model object
+            blk_id: block ID for the tube in the exodus file
+            conn: element connectivity matrix for the block (nelem, 8)
+            times: list of time values in the exodus file
+        Returns:
+            mandel_stress: Cauchy stress in Mandel-form 
+            temperatures: element-averaged temperatures
+    """
     n_times = len(times)
     n_elem = conn.shape[0]
     mandel_stress = np.zeros((n_times, n_elem, 6))
@@ -401,18 +479,24 @@ def compute_moose_reliability(rec, mat_damage, damage_model, lifetime,
         tube_multiplier: float, scaling from analysis tubes to actual
             tubes for per-panel
 
-    Returns a dict that the driver script can use:
-        {
-          "lifetime": float,
-          "tube_volume": [ ], "tube_surface": [ ], "tube_combined": [ ],
-          "panel_volume": [ ], "panel_surface": [ ], "panel_combined": [ ],
-          "overall_volume": float, "overall_surface": float, "overall_combined": float,
-        }
+    Returns:
+    a dict that the driver script can use:
+    - "lifetime": input lifetime in hours
+    - "tube_volume": list of per-tube volume flaw reliabilities(VFR) 
+    - "tube_surface": list of per-tube surface flaw reliabilities (SFR) 
+    - "tube_combined": list of per-tube combined reliabilities (CR)
+    - "panel_volume": list of per-panel VFR 
+    - "panel_surface": list of per-panel SFR 
+    - "panel_combined": list of per-panel CR 
+    - "overall_volume": overall VFR 
+    - "overall_surface": overall SFR 
+    - "overall_combined": overall CR 
+        
     """
     m3_to_mm3 = convert_m_to_mm(1.0) ** 3
     m2_to_mm2 = convert_m_to_mm(1.0) ** 2
 
-    # One representative tube 
+    # One representative tube
     sample_tube = next(iter(next(iter(rec.panels.values())).tubes.values()))
     nt, nz = sample_tube.nt, sample_tube.nz
 
