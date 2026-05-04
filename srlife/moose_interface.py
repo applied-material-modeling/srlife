@@ -8,20 +8,19 @@ using srlife's damage models.
 
 import os
 import sys
+import re
 import subprocess
 from pathlib import Path
 import numpy as np
 import netCDF4 as nc
-import re
-import pyhit
-from srlife import receiver
+import pyhit  # pylint: disable=import-error
 from srlife.receiver import make_moose_hit_vector
 from srlife.interface import convert_m_to_mm
 
 conda_env_dir = os.environ.get("CONDA_PREFIX")
 ACCESS = os.getenv("ACCESS", f"{conda_env_dir}/seacas")
 sys.path.append(os.path.join(ACCESS, "lib"))
-import exodus as exo
+import exodus as exo  # pylint: disable=import-error
 
 SQRT2 = np.sqrt(2.0)
 
