@@ -12,15 +12,14 @@ import re
 import subprocess
 from pathlib import Path
 import numpy as np
-import netCDF4 as nc # pylint: disable=import-error
-import pyhit  # pylint: disable=import-error
+import pyhit  # pylint: disable=import-error,wrong-import-position
 from srlife.receiver import make_moose_hit_vector
 from srlife.interface import convert_m_to_mm
 
 conda_env_dir = os.environ.get("CONDA_PREFIX")
 ACCESS = os.getenv("ACCESS", f"{conda_env_dir}/seacas")
 sys.path.append(os.path.join(ACCESS, "lib"))
-import exodus as exo  # pylint: disable=import-error
+import exodus as exo  # pylint: disable=import-error,wrong-import-position
 
 SQRT2 = np.sqrt(2.0)
 
@@ -190,7 +189,6 @@ def run_moose_sm_model(moose_input_filename):
     """
     Runs the MOOSE SolidMechanics module 
     Needs environment variables MOOSE_MPI, MOOSE_NPROCS, and DEER to be set.
-    TODO: Write a small NEML app and replace the usage of full Deer here
 
     Args:
       moose_input_filename (String): filename to call moose with
@@ -200,7 +198,6 @@ def run_moose_sm_model(moose_input_filename):
         print("Running MOOSE!")
         mpirun = os.environ.get("MOOSE_MPI")
         nprocs = os.environ.get("MOOSE_NPROCS")
-        # TODO: Write a small NEML app and replace the usage of full Deer here
         moose_sm = os.environ.get("NEMLAPP") 
         argv = [mpirun, "-n", nprocs, moose_sm, "-i", moose_input_filename]
         result = subprocess.run(argv,
@@ -209,7 +206,11 @@ def run_moose_sm_model(moose_input_filename):
         print(f"MOOSE returned error {e.returncode}")
         print(f"stderr: {e.stderr}")
 
-def build_structural_input(panel: int, tubes: list, flowpath: int, times, out_dir: Path, moose_thm_filename: str):
+# Disabling pylint warnings for local variables and statements. This is the main moose file writer
+# function, its bound to be long and have many variables.
+# pylint: disable=too-many-locals, too-many-statements
+def build_structural_input(panel: int, tubes: list, flowpath: int, 
+                           times, out_dir: Path, moose_thm_filename: str):
     """
     Build the structural solution file for receiver panel by panel.
 

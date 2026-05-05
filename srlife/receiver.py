@@ -14,6 +14,7 @@ import sys
 import numpy as np
 import scipy.interpolate as inter
 import h5py
+from srlife import writers
 
 
 
@@ -32,17 +33,16 @@ for path in moose_python_paths:
     if os.path.exists(path) and path not in sys.path:
         sys.path.insert(0, path)
 
-import pyhit # pylint: disable=import-error
-from pyhit import moosetree # pylint: disable=import-error
+import pyhit # pylint: disable=import-error,wrong-import-position
+from pyhit import moosetree # pylint: ddisable=import-error,wrong-import-position
 conda_env_dir = os.environ.get("CONDA_PREFIX")
 # Needed to use exodus.py
 ACCESS = os.getenv("ACCESS", f"{conda_env_dir}/seacas")
 sys.path.append(os.path.join(ACCESS, "lib"))
 sys.path.append(os.path.join(ACCESS, "lib64"))
-import exodus as exo # pylint: disable=import-error
+import exodus as exo # pylint: disable=import-error,wrong-import-position
 
 
-from srlife import writers
 
 
 class Receiver:
@@ -847,8 +847,7 @@ class Receiver:
             nprocs = os.environ.get("MOOSE_NPROCS")
             moose_thm = os.environ.get("MOOSE_THM")
             argv = [mpirun, "-n", nprocs, moose_thm, "-i", moose_input_filename]
-            result = subprocess.run(argv,
-                                    check=True, capture_output=False, text=True)
+            subprocess.run(argv,check=True, capture_output=False, text=True)
         except subprocess.CalledProcessError as e:
             print(f"MOOSE returned error {e.returncode}")
             print(f"stderr: {e.stderr}")
