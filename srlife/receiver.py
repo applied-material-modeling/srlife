@@ -21,17 +21,18 @@ from srlife import writers
 # Get absolute paths to moose python modules
 current_dir = os.path.dirname(os.path.abspath(__file__))
 repo_root = os.path.dirname(current_dir)  # go up one level
-moose_root = os.path.join(repo_root, 'moose') # go to moose directory
+MOOSE_ROOT_PATH = os.path.join(repo_root, 'moose') # go to moose directory
 # Add moose python paths for pyhit
 moose_python_paths = [
-    os.path.join(moose_root, 'python'),
-    os.path.join(moose_root, 'python', 'pyhit'),
-    os.path.join(moose_root, 'framework', 'contrib', 'hit'),
+    os.path.join(MOOSE_ROOT_PATH, 'python'),
+    os.path.join(MOOSE_ROOT_PATH, 'python', 'pyhit'),
+    os.path.join(MOOSE_ROOT_PATH, 'framework', 'contrib', 'hit'),
 ]
 
-for path in moose_python_paths:
-    if os.path.exists(path) and path not in sys.path:
-        sys.path.insert(0, path)
+for _p in moose_python_paths:
+    if os.path.exists(_p) and _p not in sys.path:
+        sys.path.insert(0, _p)
+
 
 import pyhit # pylint: disable=import-error,wrong-import-position
 from pyhit import moosetree # pylint: ddisable=import-error,wrong-import-position
@@ -767,7 +768,7 @@ class Receiver:
                     # if we are not in first panel, connect panels
                     prev_panel_name = f"panel_{flowpath['panels'][iPanel-1]}"
                     prev_panel_node = moosetree.find(
-                        comp_node, func=lambda n: n.name == prev_panel_name
+                        comp_node, func=lambda n, name=prev_panel_name: n.name == name
                     )
                     if iPanel % 2 == 0:
                         # even panel, connect bot
