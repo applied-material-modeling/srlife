@@ -36,10 +36,9 @@ def find_pin_coords(mesh_file, tol=1e-6):
     Returns:
         (xa, ya, za), (xb, yb, zb): coordinates of the two pin nodes.
          """
-    with nc.Dataset(mesh_file, "r") as exo:
-        x = np.array(exo.variables["coordx"][:])
-        y = np.array(exo.variables["coordy"][:])
-        z = np.array(exo.variables["coordz"][:])
+    model = exo.exodus(str(mesh_file), array_type="numpy")
+    x, y, z = model.get_coords()
+    model.close()
     bot_mask = np.abs(z - z.min()) < tol
     x_bot, y_bot = x[bot_mask], y[bot_mask]
     cx, cy = x_bot.mean(), y_bot.mean()
@@ -65,9 +64,9 @@ def panels_in_thm_exodus(exo_path):
         exo_path: path to the THM exodus file
     Returns:
         A sorted list of panel numbers (integers) found in the exodus file."""
-    with nc.Dataset(exo_path, "r") as exo:
-        raw = exo.variables["eb_names"][:]
-    names = ["".join(c.decode() for c in row if c).strip() for row in raw]
+    model = exo.exodus(str(exo_path), array_type="numpy")
+    names = [model.get_elem_blk_name(b) for b in model.get_elem_blk_ids()]
+    model.close()
     panels = set()
     for name in names:
         m = PANEL_BLOCK_RE.match(name)
@@ -86,8 +85,10 @@ def read_time_axis(thm_exodus: Path):
     Returns:
         A list of time values.
     """
-    with nc.Dataset(thm_exodus, "r") as exo:
-        return list(exo.variables["time_whole"][:])
+    model = exo.exodus(str(thm_exodus), array_type="numpy")
+    times = list(model.get_times())
+    model.close()
+    return times
 
 def discover_tubes(panel: int, out_dir: Path):
     """
