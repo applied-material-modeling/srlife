@@ -833,25 +833,6 @@ class Receiver:
             filenames.append(moose_flow_path_filename)
         return filenames
 
-    def run_moose_thm_model(self, moose_input_filename):
-        """
-        Runs the MOOSE THM model using inputs
-
-        Args:
-          moose_exec (String): moose executable path and name
-          moose_input_filename (String): filename to call moose with
-
-        """
-        try:
-            print("Running MOOSE!")
-            mpirun = os.environ.get("MOOSE_MPI")
-            nprocs = os.environ.get("MOOSE_NPROCS")
-            moose_thm = os.environ.get("MOOSE_THM")
-            argv = [mpirun, "-n", nprocs, moose_thm, "-i", moose_input_filename]
-            subprocess.run(argv,check=True, capture_output=False, text=True)
-        except subprocess.CalledProcessError as e:
-            print(f"MOOSE returned error {e.returncode}")
-            print(f"stderr: {e.stderr}")
 
     def get_moose_thm_results(self, moose_input_filenames):
         """

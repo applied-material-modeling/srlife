@@ -186,26 +186,6 @@ def create_moose_sm_inputs(moose_thm_filename, out_dir=None):
             )
     return input_paths, output_exodus_paths
 
-def run_moose_sm_model(moose_input_filename):
-    """
-    Runs the MOOSE SolidMechanics module 
-    Needs environment variables MOOSE_MPI, MOOSE_NPROCS, and DEER to be set.
-
-    Args:
-      moose_input_filename (String): filename to call moose with
-
-    """
-    try:
-        print("Running MOOSE!")
-        mpirun = os.environ.get("MOOSE_MPI")
-        nprocs = os.environ.get("MOOSE_NPROCS")
-        moose_sm = os.environ.get("NEMLAPP") 
-        argv = [mpirun, "-n", nprocs, moose_sm, "-i", moose_input_filename]
-        result = subprocess.run(argv,
-                    check=True, capture_output=False, text=True)
-    except subprocess.CalledProcessError as e:
-        print(f"MOOSE returned error {e.returncode}")
-        print(f"stderr: {e.stderr}")
 
 # Disabling pylint warnings for local variables and statements. This is the main moose file writer
 # function, its bound to be long and have many variables.
