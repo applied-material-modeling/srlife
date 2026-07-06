@@ -8,15 +8,17 @@
 
 import itertools
 from collections import OrderedDict
-import subprocess
-import os
-import sys 
+
 import numpy as np
 import scipy.interpolate as inter
 import h5py
+
+import subprocess
+import os
+import sys
+
 from srlife import writers
-
-
+from srlife.moose_runner import run_moose
 
 # Get absolute paths to moose python modules
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -34,16 +36,14 @@ for _p in moose_python_paths:
         sys.path.insert(0, _p)
 
 
-import pyhit # pylint: disable=import-error,wrong-import-position
-from pyhit import moosetree # pylint: ddisable=import-error,wrong-import-position
+import pyhit  # pylint: disable=import-error,wrong-import-position
+from pyhit import moosetree  # pylint: disable=import-error,wrong-import-position
 conda_env_dir = os.environ.get("CONDA_PREFIX")
 # Needed to use exodus.py
 ACCESS = os.getenv("ACCESS", f"{conda_env_dir}/seacas")
 sys.path.append(os.path.join(ACCESS, "lib"))
 sys.path.append(os.path.join(ACCESS, "lib64"))
-import exodus as exo # pylint: disable=import-error,wrong-import-position
-
-
+import exodus as exo  # pylint: disable=import-error,wrong-import-position
 
 
 class Receiver:
@@ -547,7 +547,9 @@ class Receiver:
         useControls = True
         if useControls:
             m_dot_fun = "m_dot_time_fun"
-            func_node = moosetree.find(moose_root, func=lambda n: n.name == "Functions")
+            func_node = moosetree.find(
+                moose_root, func=lambda n: n.name == "Functions"
+            )
             if func_node is None:
                 func_node = moose_root.append("Functions")
             times = np.arange(start_time, end_time, dtmax)
@@ -1409,9 +1411,7 @@ class Panel:
                 tube_height = convert_mm_to_m(tube.h)
                 x_tube_prev = tube_xs[iTube - 1]
                 y_tube_prev = tube_ys[iTube - 1]
-                if (
-                    thetas[iTube - 1] < panel_center_theta < thetas[iTube]
-                ):
+                if thetas[iTube - 1] < panel_center_theta < thetas[iTube]:
                     # this connector crosses centerline
                     self.create_moose_thm_split_connector_tube(
                         panel_node,
@@ -2348,13 +2348,7 @@ class Tube:
         tube_mesh_moose_input = f"{panel_node.name}_tube_{tube_num}"
         pyhit.write(tube_mesh_moose_input + ".i", tube_mesh_root)
         # run moose to generate tube mesh
-        try:
-            moose_exec = os.environ.get("MOOSE_THM", "MOOSE_THM")
-            result = subprocess.run([moose_exec, "-i", tube_mesh_moose_input + ".i", "--mesh-only"],
-                                    check=True, capture_output=True, text=True)
-        except subprocess.CalledProcessError as e:
-            print(f"MOOSE returned error {e.returncode}")
-            print(f"stderr: {e.stderr}")
+        run_moose(tube_mesh_moose_input + ".i", "MOOSE_THM", mesh_only=True)
 
         # if this runs, then output file will be below
         tube_mesh_file = f"{tube_mesh_moose_input}_in.e"
