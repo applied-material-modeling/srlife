@@ -11,7 +11,7 @@ jobs:
         shell: bash -leo pipefail {0}
     steps:
       - name: Checkout (with submodules)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           submodules: recursive
 
@@ -26,7 +26,7 @@ jobs:
               - conda-forge
           create-args: >-
             python=3.11
-            moose-dev=2025.09.18=mpich
+            moose-dev=2026.06.16=mpich
             moose-seacas
           cache-environment: true
           init-shell: bash
