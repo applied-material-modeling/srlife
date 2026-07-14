@@ -42,8 +42,8 @@ jobs:
           JOBS=$(nproc)
           SRLIFE_DIR="$GITHUB_WORKSPACE"
 
-          # pyhit's C binding (hit.so) — required for `import pyhit`.
-          make -C "$SRLIFE_DIR/moose/framework/contrib/hit" bindings
+          # Build MOOSE
+          make -C "$SRLIFE_DIR/moose/test" -j$MOOSE_JOBS
 
           # MOOSE framework + Thermal Hydraulics module (skips moose/test).
           make -C "$SRLIFE_DIR/moose/modules/thermal_hydraulics" -j"$JOBS"
