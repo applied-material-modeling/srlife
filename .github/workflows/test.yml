@@ -1,13 +1,71 @@
 name: tests
 on: [push, pull_request, workflow_dispatch]
+
 jobs:
   test-linux:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        # Login shell so the micromamba `srlifeMoose` env is auto-activated.
+        shell: bash -el {0}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Checkout (with submodules)
+        uses: actions/checkout@v4
         with:
-            python-version: '3.11'
-      - run: pip install -r requirements.txt
-      - run: pytest test
+          submodules: recursive
 
+      - name: Set up micromamba (moose-dev toolchain)
+        uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-name: srlifeMoose
+          condarc: |
+            channel_priority: strict
+            channels:
+              - https://conda.software.inl.gov/public
+              - conda-forge
+          create-args: >-
+            python=3.11
+            moose-dev=2025.09.18=mpich
+            moose-seacas
+          cache-environment: true
+          init-shell: bash
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Build MOOSE (thermal_hydraulics), NEML, nemlapp
+        run: |
+          set -e
+          JOBS=$(nproc)
+          SRLIFE_DIR="$GITHUB_WORKSPACE"
+
+          # pyhit's C binding (hit.so) — required for `import pyhit`.
+          make -C "$SRLIFE_DIR/moose/framework/contrib/hit" bindings
+
+          # MOOSE framework + Thermal Hydraulics module (skips moose/test).
+          make -C "$SRLIFE_DIR/moose/modules/thermal_hydraulics" -j"$JOBS"
+
+          # NEML — installed into the neml submodule prefix so libneml.so lands
+          # at nemlapp/neml/lib (where nemlapp expects it).
+          mkdir -p "$SRLIFE_DIR/nemlapp/neml/build"
+          cd "$SRLIFE_DIR/nemlapp/neml/build"
+          cmake -DCMAKE_BUILD_TYPE=Release \
+                -DCMAKE_INSTALL_PREFIX="$SRLIFE_DIR/nemlapp/neml" \
+                -DENABLE_OPENMP=OFF \
+                ..
+          make -j"$JOBS"
+          make install
+
+          # nemlapp (links against MOOSE + NEML).
+          cd "$SRLIFE_DIR/nemlapp"
+          MOOSE_DIR="$SRLIFE_DIR/moose" make -j"$JOBS"
+
+      - name: Run tests
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+          NEML_DIR: ${{ github.workspace }}/nemlapp/neml
+          LD_LIBRARY_PATH: ${{ github.workspace }}/nemlapp/neml/lib
+          NEMLAPP: ${{ github.workspace }}/nemlapp/nemlapp-opt
+          MOOSE_DIR: ${{ github.workspace }}/moose
+          MOOSE_THM: ${{ github.workspace }}/moose/modules/thermal_hydraulics/thermal_hydraulics-opt
+        run: pytest test
