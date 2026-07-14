@@ -6,8 +6,9 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        # Login shell so the micromamba `srlifeMoose` env is auto-activated.
-        shell: bash -el {0}
+        # GitHub's bash runs with --noprofile --norc, so use a login shell to
+        # pick up the micromamba activation written by `init-shell: bash`.
+        shell: bash -leo pipefail {0}
     steps:
       - name: Checkout (with submodules)
         uses: actions/checkout@v4
@@ -29,6 +30,8 @@ jobs:
             moose-seacas
           cache-environment: true
           init-shell: bash
+          # avoids the ENOENT micromamba-shell failure.
+          generate-run-shell: false
 
       - name: Install Python dependencies
         run: pip install -r requirements.txt
