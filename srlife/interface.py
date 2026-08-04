@@ -414,9 +414,10 @@ def optimize_mass_flow_rate_per_path(
                 check_outlet_temps_and_step_mass_flow(
                     rec, path, path_key, T_out_target, pct_err_outlet_temp, breaker
                 )
-            for panel_key, panel in rec.panels.items():
-                for tube_key, tube in panel.tubes.items():
-                    tube.write_vtk(f"ht-tube-{panel_key}-{tube_key}")
+            if save_heat_to_vtu:
+                for panel_key, panel in rec.panels.items():
+                    for tube_key, tube in panel.tubes.items():
+                        tube.write_vtk(f"ht-tube-{panel_key}-{tube_key}")
 
         if all(breaker):
             print(f"Converged!!! solved in {i_opt} iterations")
