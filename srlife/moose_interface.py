@@ -14,7 +14,6 @@ import numpy as np
 import pyhit  # pylint: disable=import-error,wrong-import-position
 from srlife.receiver import make_moose_hit_vector
 from srlife.interface import convert_m_to_mm
-from srlife.moose_runner import run_moose
 
 conda_env_dir = os.environ.get("CONDA_PREFIX")
 ACCESS = os.getenv("ACCESS", f"{conda_env_dir}/seacas")
@@ -552,6 +551,68 @@ def read_tube_stress_and_temp(model, blk_id, conn, times):
     return mandel_stress, temperatures
 
 
+def tube_mesh_surface_geometry(node_x, node_y, node_z, conn, sample_tube):
+    """Per-element geometry for one MOOSE HEX8 tube block, in the block's
+    element order, so that each element's MOOSE stress is paired with its
+    own volume / surface flag / outward normal / surface-face area.
+
+    Args:
+        node_x, node_y, node_z: global nodal coordinate arrays (meters) from the
+            exodus model (model.get_coords()).
+        conn: (nelem, 8) 1-based connectivity for the block.
+        sample_tube: a representative srlife Tube (for nr/nt/nz and the
+            mm-convention per-layer volume / surface-area magnitudes).
+
+    Returns:
+        volumes: (nelem,) element volumes (mm^3), one per element.
+        surface: (nelem,) bool, True for elements on the inner or outer radius.
+        normals: (nelem, 3) unit outward radial normal (global frame); zero rows
+            for interior elements.
+        areas: (nelem,) surface-face area (mm^2); zero for interior elements.
+    """
+    nr, nt, nz = sample_tube.nr, sample_tube.nt, sample_tube.nz
+    step = nt * (nz - 1)
+
+    # tube volume and area magnitudes, keyed by radial layer
+    vols = sample_tube.element_volumes()
+    vol_by_layer = np.array([vols[layer * step] for layer in range(nr - 1)])
+    sa = sample_tube.element_surface_areas()
+    half = (nz - 1) * nt # since sa is 2x this no. half are inner surfaces, half outer
+    # identical elements, one area from each will do
+    inner_area = float(sa[0]) 
+    outer_area = float(sa[half])
+
+    # radial layer centres (mm) from the tube wall discretisation
+    r_nodes = np.linspace(sample_tube.r - sample_tube.t, sample_tube.r, nr)
+    centers = 0.5 * (r_nodes[:-1] + r_nodes[1:])
+
+    # element centroids and the block's axis (mean of its nodes) in the x-y plane
+    nidx = conn - 1
+    cx = node_x[nidx].mean(axis=1)
+    cy = node_y[nidx].mean(axis=1)
+    uniq = np.unique(nidx)
+    x0, y0 = node_x[uniq].mean(), node_y[uniq].mean()
+
+    # centroid radius (mm) -> nearest radial layer
+    r_c = np.hypot(cx - x0, cy - y0) * convert_m_to_mm(1.0)
+    layer = np.argmin(np.abs(r_c[:, None] - centers[None, :]), axis=1)
+
+    ne = conn.shape[0]
+    volumes = vol_by_layer[layer]
+    surface = (layer == 0) | (layer == nr - 2)
+
+    rad = np.stack([cx - x0, cy - y0, np.zeros(ne)], axis=1)
+    rnorm = np.linalg.norm(rad, axis=1, keepdims=True)
+    rad_unit = np.divide(rad, rnorm, out=np.zeros_like(rad), where=rnorm > 0)
+    sign = np.where(layer == nr - 2, 1.0, -1.0)[:, None]  # +out on outer, -in on inner
+    normals = np.zeros((ne, 3))
+    normals[surface] = (rad_unit * sign)[surface]
+
+    areas = np.where(layer == 0, inner_area,
+                     np.where(layer == nr - 2, outer_area, 0.0))
+    return volumes, surface, normals, areas
+
+
 def compute_moose_reliability(
     rec, mat_damage, damage_model, lifetime, moose_sm_output_files, tube_multiplier
 ):
@@ -580,30 +641,8 @@ def compute_moose_reliability(
     - "overall_combined": overall CR
 
     """
-    m3_to_mm3 = convert_m_to_mm(1.0) ** 3
-    m2_to_mm2 = convert_m_to_mm(1.0) ** 2
-
-    # One representative tube
+    # One representative tube: supplies nr/nt/nz and per-layer magnitudes.
     sample_tube = next(iter(next(iter(rec.panels.values())).tubes.values()))
-    nt, nz = sample_tube.nt, sample_tube.nz
-
-    volumes = sample_tube.element_volumes() * m3_to_mm3
-    surface, normals = sample_tube.surface_elements()
-
-    # element_surface_areas() ships (z, t) per side; surface mask is (r, t, z)
-    # with z fastest -- transpose each side so areas align with the mask.
-    sa_raw = sample_tube.element_surface_areas()
-    half = (nz - 1) * nt
-    inner_sa = sa_raw[:half].reshape(nz - 1, nt).T.flatten()
-    outer_sa = sa_raw[half:].reshape(nz - 1, nt).T.flatten()
-    surface_areas = np.concatenate([inner_sa, outer_sa]) * m2_to_mm2
-
-    # Reorder so surface elements come first -- workaround for srlife's
-    # damage.py [:count_surface_elements] slicing in the surface-flaw call.
-    sort_order = np.argsort(~surface)
-    volumes_r = volumes[sort_order]
-    surface_r = surface[sort_order]
-    normals_r = normals[sort_order]
 
     per_panel_tube_results = []
     for sm_exo_path in moose_sm_output_files:
@@ -612,6 +651,8 @@ def compute_moose_reliability(
         times_hr = (
             times / 3600.0
         )  # in moose solution the time is in seconds, here we need hours.
+
+        node_x, node_y, node_z = model.get_coords()
         tube_results = []
         for blk_id in model.get_elem_blk_ids():
             conn_flat, num_elem, npe = model.get_elem_connectivity(blk_id)
@@ -621,6 +662,19 @@ def compute_moose_reliability(
             mandel_stress, temperatures = read_tube_stress_and_temp(
                 model, blk_id, conn, times
             )
+
+            # Per-element geometry in this block's exodus order (global frame).
+            volumes_e, surface_e, normals_e, areas_e = tube_mesh_surface_geometry(
+                node_x, node_y, node_z, conn, sample_tube
+            )
+            # Sort to surface elements first, similar to srlife's [:count_surface_elements] slice.
+            sort_order = np.argsort(~surface_e)
+            count_s = int(np.count_nonzero(surface_e))
+            volumes_r = volumes_e[sort_order]
+            surface_r = surface_e[sort_order]
+            normals_r = normals_e[sort_order]
+            surface_areas = areas_e[sort_order][:count_s]
+
             mandel_stress = mandel_stress[:, sort_order]
             temperatures = temperatures[:, sort_order]
             vol_log_rel = damage_model.calculate_volume_flaw_element_log_reliability(
