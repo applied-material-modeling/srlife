@@ -83,7 +83,9 @@ disable=raw-checker-failed,
         unnecessary-lambda-assignment,
         implicit-str-concat,
         too-many-lines,
-        too-many-public-methods
+        too-many-public-methods,
+        too-many-locals,
+        wrong-import-order
 
 # Enable the message, report, category or checker with the given id(s). You can
 # either give multiple identifier separated by comma (,) or put this option
