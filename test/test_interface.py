@@ -1,5 +1,6 @@
 import unittest
 import tempfile
+import os
 
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
@@ -262,8 +263,9 @@ class InterfaceUnitTests(unittest.TestCase):
 class InterfaceRegressionTest(unittest.TestCase):
     def test_simple_model(self):
         multiprocess.set_start_method("spawn", force=True)
-        # Receiver filename to write to
-        rec_filename = "./test/Rec_Test"
+        # Receiver filename to write to (tmp dir so the test doesn't pollute the repo)
+        tdir = tempfile.mkdtemp()
+        rec_filename = os.path.join(tdir, "Rec_Test")
         # file extension used by srlife
         hdf5_ext = ".hdf5"
 
@@ -485,7 +487,7 @@ class InterfaceRegressionTest(unittest.TestCase):
             # Saving optimized results to base filename
             rec.save(rec_filename + hdf5_ext)
         else:
-            rec_filename = "./Rec_Test_ht_iter_2"
+            rec_filename = os.path.join(tdir, "Rec_Test_ht_iter_2")
             rec = receiver.Receiver.load(rec_filename + hdf5_ext)
 
         mass_flow = np.array([path["mass_flow"] for path in rec.flowpaths.values()])
