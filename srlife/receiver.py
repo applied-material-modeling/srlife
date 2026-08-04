@@ -7,15 +7,13 @@
 """
 
 import itertools
+import os
+import sys
 from collections import OrderedDict
 
 import numpy as np
 import scipy.interpolate as inter
 import h5py
-
-import subprocess
-import os
-import sys
 
 from srlife import writers
 from srlife.moose_runner import run_moose
@@ -23,12 +21,12 @@ from srlife.moose_runner import run_moose
 # Get absolute paths to moose python modules
 current_dir = os.path.dirname(os.path.abspath(__file__))
 repo_root = os.path.dirname(current_dir)  # go up one level
-MOOSE_ROOT_PATH = os.path.join(repo_root, 'moose') # go to moose directory
+MOOSE_ROOT_PATH = os.path.join(repo_root, "moose")  # go to moose directory
 # Add moose python paths for pyhit
 moose_python_paths = [
-    os.path.join(MOOSE_ROOT_PATH, 'python'),
-    os.path.join(MOOSE_ROOT_PATH, 'python', 'pyhit'),
-    os.path.join(MOOSE_ROOT_PATH, 'framework', 'contrib', 'hit'),
+    os.path.join(MOOSE_ROOT_PATH, "python"),
+    os.path.join(MOOSE_ROOT_PATH, "python", "pyhit"),
+    os.path.join(MOOSE_ROOT_PATH, "framework", "contrib", "hit"),
 ]
 
 for _p in moose_python_paths:
@@ -38,6 +36,7 @@ for _p in moose_python_paths:
 
 import pyhit  # pylint: disable=import-error,wrong-import-position
 from pyhit import moosetree  # pylint: disable=import-error,wrong-import-position
+
 conda_env_dir = os.environ.get("CONDA_PREFIX")
 # Needed to use exodus.py
 ACCESS = os.getenv("ACCESS", f"{conda_env_dir}/seacas")
@@ -547,9 +546,7 @@ class Receiver:
         useControls = True
         if useControls:
             m_dot_fun = "m_dot_time_fun"
-            func_node = moosetree.find(
-                moose_root, func=lambda n: n.name == "Functions"
-            )
+            func_node = moosetree.find(moose_root, func=lambda n: n.name == "Functions")
             if func_node is None:
                 func_node = moose_root.append("Functions")
             times = np.arange(start_time, end_time, dtmax)
@@ -834,7 +831,6 @@ class Receiver:
             pyhit.write(moose_flow_path_filename, moose_root)
             filenames.append(moose_flow_path_filename)
         return filenames
-
 
     def get_moose_thm_results(self, moose_input_filenames):
         """
