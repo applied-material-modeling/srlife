@@ -22,6 +22,10 @@ sys.path.append(os.path.join(ACCESS, "lib"))
 import exodus as exo  # pylint: disable=import-error,wrong-import-position
 
 SQRT2 = np.sqrt(2.0)
+# Structural material and NEML model variant -> data/deformation/<name>.xml
+MATERIAL_DIR = Path(__file__).resolve().parent / "data" / "deformation"
+DEFAULT_MATERIAL = "SiC"
+DEFAULT_MATERIAL_MODEL = "cares"
 
 
 def find_pin_coords(mesh_file, tol=1e-6):
@@ -156,13 +160,22 @@ def extract_thm_pressures_to_dat(thm_exo_path, out_dir):
     model.close()
 
 
-def create_moose_sm_inputs(moose_thm_filename, out_dir=None):
+def create_moose_sm_inputs(
+    moose_thm_filename,
+    material=DEFAULT_MATERIAL,
+    material_model=DEFAULT_MATERIAL_MODEL,
+    out_dir=None,
+):
     """
     Creates MOOSE Solid Mechanics input files for each receiver panel based on the THM results.
     Expects the THM Exodus files to be named {moose_thm_filename}_flowpath_{fp}_exo.e
 
     Args:
         moose_thm_filename (String): base filename of the MOOSE THM Exodus outputs
+        material (String, optional): name of the NEML deformation model file in
+        data/deformation/ (without the .xml extension). Defaults to DEFAULT_MATERIAL.
+        material_model (String, optional): NEML model variant within that file.
+        Defaults to DEFAULT_MATERIAL_MODEL.
         out_dir (String, optional): directory where THM exodus files are located.
         This is also where the structural input files will be written. Defaults to
         current working directory.
@@ -181,7 +194,14 @@ def create_moose_sm_inputs(moose_thm_filename, out_dir=None):
         for panel in panels_in_thm_exodus(exo_path):
             tubes = discover_tubes(panel, out_dir)
             root, i_name = build_structural_input(
-                panel, tubes, fp, times, out_dir, moose_thm_filename
+                panel,
+                tubes,
+                fp,
+                times,
+                out_dir,
+                moose_thm_filename,
+                material,
+                material_model,
             )
             input_path = out_dir / i_name
             pyhit.write(str(input_path), root)
@@ -202,6 +222,8 @@ def build_structural_input(
     times,
     out_dir: Path,
     moose_thm_filename: str,
+    material: str,
+    material_model: str,
 ):
     """
     Build the structural solution file for receiver panel by panel.
@@ -213,6 +235,8 @@ def build_structural_input(
         times: list, time values
         out_dir: Path, directory where the structural input file will be written
         moose_thm_filename: str, base filename of the MOOSE THM Exodus outputs
+        material: str, name of the NEML deformation model file in data/deformation/
+        material_model: str, NEML model variant within that file
 
     Returns:
         root: pyhit.Node, used to write the MOOSE input file
@@ -410,19 +434,20 @@ def build_structural_input(
         penalty=1e7,
     )
 
+    material_db = str(MATERIAL_DIR / f"{material}.xml")
     materials = root.append("Materials")
     materials.append(
         "stress",
         type="CauchyStressFromNEML",
-        database="../srlife/srlife/data/deformation/SiC.xml",
-        model="cares",
+        database=material_db,
+        model=material_model,
         temperature="temp",
     )
     materials.append(
         "thermal_strain",
         type="ComputeThermalExpansionEigenstrainNEML",
-        database="../srlife/srlife/data/deformation/SiC.xml",
-        model="cares",
+        database=material_db,
+        model=material_model,
         temperature="temp",
         stress_free_temperature=300.0,
         eigenstrain_name="eigenstrain",
