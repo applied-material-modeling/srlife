@@ -33,9 +33,7 @@ def _moose_available():
 
 def build_small_receiver():
     """Two panels, two analysis tubes/panel, two flow paths: the minimum that
-    still exercises the multi-panel structural + reliability machinery
-    (create_moose_sm_inputs requires exactly 2 flow paths; tubes/panel must
-    be >= 2 for the panel in/out flow channels to be built)."""
+    exercises the multi-panel structural + reliability machinery."""
     num_panels = 2
     rec_diam = 10000.0  # mm
     rec_height = 12000.0  # mm
@@ -115,6 +113,7 @@ class MooseInterfaceTest(unittest.TestCase):
             "MOOSE executables not available; Provide path to MOOSE_THM, NEMLAPP and MOOSE_MPI."
             )        
         os.environ["MOOSE_NPROCS"] = "2"  # mpi procs, this is enough for the test mesh
+        cls.addClassCleanup(os.chdir, os.getcwd())
         os.chdir(tempfile.mkdtemp())
 
     def test_full_moose_pipeline(self):
