@@ -1033,7 +1033,7 @@ class CrackShapeDependent(WeibullFailureModel):
         else:
             sigma_e[sigma_e < 0] = 0
             g = (
-                np.trapz(
+                np.trapezoid(
                     (sigma_e / (sigma_e_max + self.tolerance)) ** Navg[..., None, None],
                     time,
                     axis=0,
@@ -1196,7 +1196,7 @@ class CrackShapeDependent(WeibullFailureModel):
         else:
             sigma_e[sigma_e < 0] = 0
             g = (
-                np.trapz(
+                np.trapezoid(
                     (sigma_e / (sigma_e_max + self.tolerance))
                     ** Navg[..., None, None, None],
                     time,
@@ -1474,7 +1474,7 @@ class PIAModel(CrackShapeIndependent):
         # Calculating ratio of cyclic stress to max cyclic stress (in one cycle)
         # for time-independent and time-dependent cases
         g = (
-            np.trapz(
+            np.trapezoid(
                 (pstress / (pstress_max + 1.0e-14)) ** Navg[..., None],
                 time,
                 axis=0,
@@ -1556,7 +1556,7 @@ class PIAModel(CrackShapeIndependent):
         # Calculating ratio of cyclic stress to max cyclic stress (in one cycle)
         # for time-independent and time-dependent cases
         g = (
-            np.trapz(
+            np.trapezoid(
                 (surf_pstress / (surf_pstress_max + 1.0e-14)) ** Navg[..., None, None],
                 time,
                 axis=0,
@@ -1743,7 +1743,7 @@ class WNTSAModel(CrackShapeIndependent):
             sigma_n_0 = sigma_n
         else:
             g = (
-                np.trapz(
+                np.trapezoid(
                     (sigma_n / (sigma_n_max + self.tolerance)) ** Navg[..., None, None],
                     time,
                     axis=0,
@@ -1890,7 +1890,7 @@ class WNTSAModel(CrackShapeIndependent):
             sigma_n_0 = sigma_n
         else:
             g = (
-                np.trapz(
+                np.trapezoid(
                     (sigma_n / (sigma_n_max + self.tolerance))
                     ** Navg[..., None, None, None],
                     time,

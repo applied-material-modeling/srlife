@@ -1,0 +1,6 @@
+[submodule "moose"]
+	path = moose
+	url = https://github.com/idaholab/moose.git
+[submodule "nemlapp"]
+	path = nemlapp
+	url = https://github.com/sagarbhatt0904/nemlapp.git

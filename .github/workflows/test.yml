@@ -1,13 +1,86 @@
 name: tests
-on: [push, pull_request]
+on: [push, pull_request, workflow_dispatch]
+
 jobs:
   test-linux:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        # GitHub's bash runs with --noprofile --norc, so use a login shell to
+        # pick up the micromamba activation written by `init-shell: bash`.
+        shell: bash -leo pipefail {0}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-            python-version: '3.11'
-      - run: pip install -r requirements.txt
-      - run: pytest test
+      - name: Checkout
+        uses: actions/checkout@v5
 
+      - name: Checkout submodules (moose, nemlapp, neml)
+        # Non-recursive on purpose: moose-dev supplies libMesh/PETSc/WASP, so we
+        # do NOT want moose's own petsc/libmesh submodules (multi-GB). We only need
+        # the moose framework source, nemlapp, and nemlapp's neml.
+        run: |
+          git submodule update --init moose nemlapp
+          git -C nemlapp submodule update --init
+
+      - name: Set up micromamba (moose-dev toolchain)
+        uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-name: srlifeMoose
+          condarc: |
+            channel_priority: strict
+            channels:
+              - https://conda.software.inl.gov/public
+              - conda-forge
+          create-args: >-
+            python=3.11
+            moose-dev=2026.06.16=mpich
+            moose-seacas
+            cython
+          cache-environment: true
+          init-shell: bash
+          # avoids the ENOENT micromamba-shell failure.
+          generate-run-shell: false
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Build hit bindings, thermal_hydraulics, NEML, nemlapp
+        run: |
+          JOBS=$(nproc)
+          SRLIFE_DIR="$GITHUB_WORKSPACE"
+
+          # pyhit binding (hit.so) — required by `import pyhit` in srlife.receiver.
+          make -C "$SRLIFE_DIR/moose/framework/contrib/hit" bindings
+
+          # MOOSE framework + Thermal Hydraulics module (provides thermal_hydraulics-opt).
+          make -C "$SRLIFE_DIR/moose/modules/thermal_hydraulics" -j"$JOBS"
+
+          # NEML — installed into the neml submodule prefix so libneml.so lands at
+          # nemlapp/neml/lib (where nemlapp's Makefile expects it). USE_OPENMP=OFF
+          # avoids neml's unquoted `set(CMAKE_CXX_FLAGS ...)` emitting a semicolon
+          # list when conda's CXXFLAGS is set; srlife does not use neml's OpenMP path.
+          mkdir -p "$SRLIFE_DIR/nemlapp/neml/build"
+          cd "$SRLIFE_DIR/nemlapp/neml/build"
+          cmake -DCMAKE_BUILD_TYPE=Release \
+                -DCMAKE_INSTALL_PREFIX="$SRLIFE_DIR/nemlapp/neml" \
+                -DUSE_OPENMP=OFF \
+                ..
+          make -j"$JOBS"
+          make install
+
+          # nemlapp (links MOOSE HEAT_TRANSFER + SOLID_MECHANICS + NEML).
+          cd "$SRLIFE_DIR/nemlapp"
+          MOOSE_DIR="$SRLIFE_DIR/moose" make -j"$JOBS"
+
+      - name: Run tests
+        env:
+          NEML_DIR: ${{ github.workspace }}/nemlapp/neml
+          NEMLAPP: ${{ github.workspace }}/nemlapp/nemlapp-opt
+          MOOSE_DIR: ${{ github.workspace }}/moose
+          MOOSE_THM: ${{ github.workspace }}/moose/modules/thermal_hydraulics/thermal_hydraulics-opt
+        run: |
+          # moose-seacas installs exodus.py under $CONDA_PREFIX/moose-seacas, not the
+          # $CONDA_PREFIX/seacas that receiver.py defaults ACCESS to.
+          export ACCESS="$CONDA_PREFIX/moose-seacas"
+          export PYTHONPATH="$GITHUB_WORKSPACE:${PYTHONPATH:-}"
+          export LD_LIBRARY_PATH="$GITHUB_WORKSPACE/nemlapp/neml/lib:$CONDA_PREFIX/moose-seacas/lib:${LD_LIBRARY_PATH:-}"
+          pytest test
