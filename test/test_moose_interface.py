@@ -44,9 +44,7 @@ def build_small_receiver():
     tube_eta = 0.01e-3  # roughness, mm
 
     ass_tube_per_panel = 2
-    act_tube_per_panel = int(
-        np.pi * rec_diam / (num_panels * (tube_od + tube_spacing))
-    )
+    act_tube_per_panel = int(np.pi * rec_diam / (num_panels * (tube_od + tube_spacing)))
     tube_multiplier = act_tube_per_panel / ass_tube_per_panel
 
     flux_data_shape = [25, 25]
@@ -103,21 +101,21 @@ def build_small_receiver():
 
 class MooseInterfaceTest(unittest.TestCase):
     """
-     Test MOOSE THM + solid mechanics + srlife reliability.
+    Test MOOSE THM + solid mechanics + srlife reliability.
     """
 
     @classmethod
     def setUpClass(cls):
         if not _moose_available():
             raise unittest.SkipTest(
-            "MOOSE executables not available; Provide path to MOOSE_THM, NEMLAPP and MOOSE_MPI."
-            )        
+                "MOOSE executables not available; Provide path to MOOSE_THM, NEMLAPP and MOOSE_MPI."
+            )
         os.environ["MOOSE_NPROCS"] = "2"  # mpi procs, this is enough for the test mesh
         cls.addClassCleanup(os.chdir, os.getcwd())
         os.chdir(tempfile.mkdtemp())
 
     def test_full_moose_pipeline(self):
-        """ Run the moose solve and compare"""
+        """Run the moose solve and compare"""
         rec, rec_data = build_small_receiver()
         manifold_tube = receiver.Tube(0.5 * 502.15, 45.24, -1.0, 1, 1, 4)
 
@@ -140,8 +138,8 @@ class MooseInterfaceTest(unittest.TestCase):
         for fname in moose_thm_filenames:
             moose_runner.run_moose(fname, "MOOSE_THM")
 
-        moose_sm_input_files, moose_sm_output_files = moose_interface.create_moose_sm_inputs(
-            MOOSE_THM_FILENAME
+        moose_sm_input_files, moose_sm_output_files = (
+            moose_interface.create_moose_sm_inputs(MOOSE_THM_FILENAME)
         )
         for sm_in in moose_sm_input_files:
             moose_runner.run_moose(str(sm_in), "NEMLAPP")
@@ -161,7 +159,7 @@ class MooseInterfaceTest(unittest.TestCase):
         self.check_against_gold(results)
 
     def check_against_gold(self, results):
-        """ Funtion to compare against gold results"""
+        """Funtion to compare against gold results"""
         with open(GOLD_FILE, encoding="utf-8") as f:
             gold = json.load(f)
         for key in gold:

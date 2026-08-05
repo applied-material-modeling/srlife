@@ -577,9 +577,9 @@ def tube_mesh_surface_geometry(node_x, node_y, node_z, conn, sample_tube):
     vols = sample_tube.element_volumes()
     vol_by_layer = np.array([vols[layer * step] for layer in range(nr - 1)])
     sa = sample_tube.element_surface_areas()
-    half = (nz - 1) * nt # since sa is 2x this no. half are inner surfaces, half outer
+    half = (nz - 1) * nt  # since sa is 2x this no. half are inner surfaces, half outer
     # identical elements, one area from each will do
-    inner_area = float(sa[0]) 
+    inner_area = float(sa[0])
     outer_area = float(sa[half])
 
     # radial layer centres (mm) from the tube wall discretisation
@@ -608,8 +608,7 @@ def tube_mesh_surface_geometry(node_x, node_y, node_z, conn, sample_tube):
     normals = np.zeros((ne, 3))
     normals[surface] = (rad_unit * sign)[surface]
 
-    areas = np.where(layer == 0, inner_area,
-                     np.where(layer == nr - 2, outer_area, 0.0))
+    areas = np.where(layer == 0, inner_area, np.where(layer == nr - 2, outer_area, 0.0))
     return volumes, surface, normals, areas
 
 

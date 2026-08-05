@@ -13,7 +13,7 @@ def run_moose(input_filename, executable_env_var="MOOSE_THM", mesh_only=False):
 
     Args:
         input_filename (str): path to MOOSE input (.i) file
-        executable_env_var (str): env var holding moose executable path, 
+        executable_env_var (str): env var holding moose executable path,
                                   thermal_hydraulics-opt for THM and
                                   nemlapp-opt for structural solve
         mesh_only (bool): if True, run with --mesh-only and no mpirun
