@@ -519,6 +519,8 @@ max-statements=50
 # Minimum number of public methods for a class (see R0903).
 min-public-methods=1
 
+# Allow small blocks of similar code
+min-similarity-lines=15
 
 [EXCEPTIONS]
 
